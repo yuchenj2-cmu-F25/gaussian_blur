@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
     double flops_5x16_lowload = 0.0;
     double flops_10x8 = 0.0;
     double flops_4x80 = 0.0;
+    double flops_2d_24x80 = 0.0;
     double flops_reference = 0.0;
 
 
@@ -142,6 +143,31 @@ int main(int argc, char *argv[]) {
     sums = .0f;
 
 
+    // Benchmark 2D 24x80
+    if (!csv_mode) {
+        t0 = rdtsc();
+        gaussian_blur_2d_24x80(input, output);
+        t1 = rdtsc();
+        cycles = (double)(t1 - t0);
+        printf("Gaussian blur 2d_24x80 took %.0f cycles\n", cycles);
+        printf(" %lf\n", (12.0*HEIGHT*WIDTH)/((double)(cycles/(1.0))));
+    }
+
+    sums = .0f;
+    for (size_t i = 0; i < RUNS; ++i) {
+        t0 = rdtsc();
+        gaussian_blur_2d_24x80(input, output);
+        t1 = rdtsc();
+        sums += (double)(t1 - t0);
+    }
+    flops_2d_24x80 = (12.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    if (!csv_mode) {
+        printf("Gaussian blur 2d_24x80 average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %lf\n", flops_2d_24x80);
+    }
+    sums = .0f;
+
+
     // Benchmark reference (for correctness and as scalar baseline)
     gaussian_blur_reference(input, reference);
 
@@ -174,8 +200,8 @@ int main(int argc, char *argv[]) {
 
     // CSV output mode: print single line with all FLOPS/cycle values
     if (csv_mode) {
-        printf("%.6f,%.6f,%.6f,%.6f,%.6f\n",
-               flops_reference, flops_5x16, flops_5x16_lowload, flops_10x8, flops_4x80);
+        printf("%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+               flops_reference, flops_5x16, flops_5x16_lowload, flops_10x8, flops_4x80, flops_2d_24x80);
     }
 
     return 0;

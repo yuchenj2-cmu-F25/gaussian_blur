@@ -470,6 +470,104 @@ void gaussian_blur_reference(float input[HEIGHT][WIDTH], float output[HEIGHT][WI
 #pragma GCC pop_options
 #endif
 
+void gaussian_blur_2d_24x80(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH]) {
+    const int src_stride = WIDTH;
+    const int dst_stride = WIDTH;
+    const int block_h = 24;
+    const int block_w = 80;
+    const int scalar_left = 8; // multiple of 8 for optimization
+
+    // 2D Gaussian kernel coefficients
+    const float k_corner = 0.0625f;  // 1/16
+    const float k_edge   = 0.125f;   // 2/16
+    const float k_center = 0.25f;    // 4/16
+
+    // Handle top row (row 0) with scalar code
+    for (int c = 0; c < WIDTH; ++c) {
+        const float *row_m1 = &input[0][0];     // clamp to row 0
+        const float *row_0  = &input[0][0];
+        const float *row_p1 = &input[1][0];
+        int c_m1 = (c == 0) ? 0 : (c - 1);
+        int c_p1 = (c == WIDTH - 1) ? (WIDTH - 1) : (c + 1);
+
+        output[0][c] = k_corner * row_m1[c_m1] + k_edge * row_m1[c] + k_corner * row_m1[c_p1]
+                     + k_edge   * row_0[c_m1]  + k_center * row_0[c]  + k_edge   * row_0[c_p1]
+                     + k_corner * row_p1[c_m1] + k_edge * row_p1[c] + k_corner * row_p1[c_p1];
+    }
+
+    // Handle left columns (0 to scalar_left-1) for rows 1 to HEIGHT-1 with scalar code
+    for (int r = 1; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &input[r_m1][0];
+        const float *row_0  = &input[r][0];
+        const float *row_p1 = &input[r_p1][0];
+
+        for (int c = 0; c < scalar_left; ++c) {
+            int c_m1 = (c == 0) ? 0 : (c - 1);
+            int c_p1 = c + 1;
+
+            output[r][c] = k_corner * row_m1[c_m1] + k_edge * row_m1[c] + k_corner * row_m1[c_p1]
+                         + k_edge   * row_0[c_m1]  + k_center * row_0[c]  + k_edge   * row_0[c_p1]
+                         + k_corner * row_p1[c_m1] + k_edge * row_p1[c] + k_corner * row_p1[c_p1];
+        }
+    }
+
+    // Process bulk with 24x80 2D kernel
+    // Start from row 1, column scalar_left
+    int r;
+    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
+            const float *src_block = &input[r][c];
+            float *dst_block = &output[r][c];
+
+            kernel_conv3_2d_24x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride
+            );
+        }
+
+        // Handle remaining right columns for this row block with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            int rr_m1 = rr - 1;
+            int rr_p1 = (rr == HEIGHT - 1) ? (HEIGHT - 1) : (rr + 1);
+            const float *row_m1 = &input[rr_m1][0];
+            const float *row_0  = &input[rr][0];
+            const float *row_p1 = &input[rr_p1][0];
+
+            for (int cc = c; cc < WIDTH; ++cc) {
+                int cc_m1 = cc - 1;
+                int cc_p1 = (cc == WIDTH - 1) ? (WIDTH - 1) : (cc + 1);
+
+                output[rr][cc] = k_corner * row_m1[cc_m1] + k_edge * row_m1[cc] + k_corner * row_m1[cc_p1]
+                               + k_edge   * row_0[cc_m1]  + k_center * row_0[cc]  + k_edge   * row_0[cc_p1]
+                               + k_corner * row_p1[cc_m1] + k_edge * row_p1[cc] + k_corner * row_p1[cc_p1];
+            }
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &input[r_m1][0];
+        const float *row_0  = &input[r][0];
+        const float *row_p1 = &input[r_p1][0];
+
+        for (int c = scalar_left; c < WIDTH; ++c) {
+            int c_m1 = c - 1;
+            int c_p1 = (c == WIDTH - 1) ? (WIDTH - 1) : (c + 1);
+
+            output[r][c] = k_corner * row_m1[c_m1] + k_edge * row_m1[c] + k_corner * row_m1[c_p1]
+                         + k_edge   * row_0[c_m1]  + k_center * row_0[c]  + k_edge   * row_0[c_p1]
+                         + k_corner * row_p1[c_m1] + k_edge * row_p1[c] + k_corner * row_p1[c_p1];
+        }
+    }
+}
+
 void gaussian_blur(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH]) {
     const float kernel[3] = {0.25f, 0.5f, 0.25f}; // normalized 1D kernel
 

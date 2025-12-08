@@ -50,4 +50,8 @@ void kernel_conv3_vert_4x80_upper(const float *restrict src, int src_stride,
 void kernel_conv3_vert_4x80_lower(const float *restrict src, int src_stride,
                         float *restrict dst, int dst_stride);
 
+/* 2D 24x80 convolution kernel (combined horizontal and vertical) */
+void kernel_conv3_2d_24x80(const float *restrict src, int src_stride,
+                           float *restrict dst, int dst_stride);
+
 #endif /* KERNELS_H */
