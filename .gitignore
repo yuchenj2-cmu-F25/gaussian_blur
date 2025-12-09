@@ -2,3 +2,6 @@
 blur_test
 blur_benchmark
 **/*.csv
+archive/
+*.zip
+.DS_Store
