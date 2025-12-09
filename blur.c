@@ -1023,3 +1023,251 @@ void gaussian_blur_faster(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH
         }
     }
 }
+
+// Canny edge detection pipeline: Gaussian blur + Sobel gradients
+void canny_sobel_4x80(float input[HEIGHT][WIDTH],
+                      float grad_x[HEIGHT][WIDTH],
+                      float grad_y[HEIGHT][WIDTH])
+{
+    const int src_stride = WIDTH;
+    const int dst_stride = WIDTH;
+    const int block_h = 4;
+    const int block_w = 80;
+    const int scalar_left = 8; // multiple of 8 for optimization
+
+    static float blurred[HEIGHT][WIDTH];
+    static float tmp_x[HEIGHT][WIDTH];
+    static float tmp_y[HEIGHT][WIDTH];
+
+    // Sobel kernel coefficients
+    const float k_smooth0 = 1.0f;  // smoothing kernel [1, 2, 1]
+    const float k_smooth1 = 2.0f;
+    const float k_deriv0 = -1.0f;  // derivative kernel [-1, 0, 1]
+    const float k_deriv1 = 1.0f;
+
+    // ========== STEP 1: GAUSSIAN BLUR ==========
+    gaussian_blur_4x80(input, blurred);
+
+    // ========== STEP 2: SOBEL X (VERTICAL EDGES) ==========
+    // Vertical smoothing pass [1, 2, 1]
+
+    // Handle top row (row 0) with scalar code
+    for (int c = 0; c < WIDTH; ++c) {
+        const float *row = &blurred[0][0];
+        tmp_x[0][c] = k_smooth0 * row[c] + k_smooth1 * row[c] + k_smooth0 * blurred[1][c];
+    }
+
+    // Handle left columns for rows 1+
+    for (int r = 1; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &blurred[r_m1][0];
+        const float *row_0  = &blurred[r][0];
+        const float *row_p1 = &blurred[r_p1][0];
+
+        for (int c = 0; c < scalar_left; ++c) {
+            tmp_x[r][c] = k_smooth0 * row_m1[c] + k_smooth1 * row_0[c] + k_smooth0 * row_p1[c];
+        }
+    }
+
+    // Process bulk vertical smoothing
+    int r;
+    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
+            const float *src_block = &blurred[r][c];
+            float *dst_block = &tmp_x[r][c];
+
+            kernel_sobel_vert_smooth_4x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride
+            );
+        }
+
+        // Handle remaining right columns with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            int rr_m1 = rr - 1;
+            int rr_p1 = (rr == HEIGHT - 1) ? (HEIGHT - 1) : (rr + 1);
+            const float *row_m1 = &blurred[rr_m1][0];
+            const float *row_0  = &blurred[rr][0];
+            const float *row_p1 = &blurred[rr_p1][0];
+
+            for (int cc = c; cc < WIDTH; ++cc) {
+                tmp_x[rr][cc] = k_smooth0 * row_m1[cc] + k_smooth1 * row_0[cc] + k_smooth0 * row_p1[cc];
+            }
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &blurred[r_m1][0];
+        const float *row_0  = &blurred[r][0];
+        const float *row_p1 = &blurred[r_p1][0];
+
+        for (int c = scalar_left; c < WIDTH; ++c) {
+            tmp_x[r][c] = k_smooth0 * row_m1[c] + k_smooth1 * row_0[c] + k_smooth0 * row_p1[c];
+        }
+    }
+
+    // Horizontal derivative pass [-1, 0, 1]
+    for (int r = 0; r < HEIGHT; ++r) {
+        const float *row = &tmp_x[r][0];
+
+        // Handle left edge (clamp to left boundary)
+        grad_x[r][0] = k_deriv0 * row[0] + k_deriv1 * row[1];
+
+        for (int c = 1; c < scalar_left; ++c) {
+            grad_x[r][c] = k_deriv0 * row[c-1] + k_deriv1 * row[c+1];
+        }
+    }
+
+    // Process bulk horizontal derivative
+    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
+            const float *src_block = &tmp_x[r][c];
+            float *dst_block = &grad_x[r][c];
+
+            kernel_sobel_horiz_deriv_4x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride
+            );
+        }
+
+        // Handle remaining right columns with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            const float *row = &tmp_x[rr][0];
+            for (int cc = c; cc < WIDTH - 1; ++cc) {
+                grad_x[rr][cc] = k_deriv0 * row[cc-1] + k_deriv1 * row[cc+1];
+            }
+            // Handle right edge
+            grad_x[rr][WIDTH-1] = k_deriv0 * row[WIDTH-2] + k_deriv1 * row[WIDTH-1];
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        const float *row = &tmp_x[r][0];
+        for (int c = scalar_left; c < WIDTH - 1; ++c) {
+            grad_x[r][c] = k_deriv0 * row[c-1] + k_deriv1 * row[c+1];
+        }
+        // Handle right edge
+        grad_x[r][WIDTH-1] = k_deriv0 * row[WIDTH-2] + k_deriv1 * row[WIDTH-1];
+    }
+
+    // ========== STEP 3: SOBEL Y (HORIZONTAL EDGES) ==========
+    // Vertical derivative pass [-1, 0, 1]
+
+    // Handle top row (row 0) with scalar code (clamp to top boundary)
+    for (int c = 0; c < WIDTH; ++c) {
+        const float *row_0  = &blurred[0][0];
+        const float *row_p1 = &blurred[1][0];
+        tmp_y[0][c] = k_deriv0 * row_0[c] + k_deriv1 * row_p1[c];
+    }
+
+    // Handle left columns for rows 1+
+    for (int r = 1; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &blurred[r_m1][0];
+        const float *row_p1 = &blurred[r_p1][0];
+
+        for (int c = 0; c < scalar_left; ++c) {
+            tmp_y[r][c] = k_deriv0 * row_m1[c] + k_deriv1 * row_p1[c];
+        }
+    }
+
+    // Process bulk vertical derivative
+    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
+            const float *src_block = &blurred[r][c];
+            float *dst_block = &tmp_y[r][c];
+
+            kernel_sobel_vert_deriv_4x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride
+            );
+        }
+
+        // Handle remaining right columns with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            int rr_m1 = rr - 1;
+            int rr_p1 = (rr == HEIGHT - 1) ? (HEIGHT - 1) : (rr + 1);
+            const float *row_m1 = &blurred[rr_m1][0];
+            const float *row_p1 = &blurred[rr_p1][0];
+
+            for (int cc = c; cc < WIDTH; ++cc) {
+                tmp_y[rr][cc] = k_deriv0 * row_m1[cc] + k_deriv1 * row_p1[cc];
+            }
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &blurred[r_m1][0];
+        const float *row_p1 = &blurred[r_p1][0];
+
+        for (int c = scalar_left; c < WIDTH; ++c) {
+            tmp_y[r][c] = k_deriv0 * row_m1[c] + k_deriv1 * row_p1[c];
+        }
+    }
+
+    // Horizontal smoothing pass [1, 2, 1]
+    for (int r = 0; r < HEIGHT; ++r) {
+        const float *row = &tmp_y[r][0];
+
+        // Handle left edge
+        grad_y[r][0] = k_smooth0 * row[0] + k_smooth1 * row[0] + k_smooth0 * row[1];
+
+        for (int c = 1; c < scalar_left; ++c) {
+            grad_y[r][c] = k_smooth0 * row[c-1] + k_smooth1 * row[c] + k_smooth0 * row[c+1];
+        }
+    }
+
+    // Process bulk horizontal smoothing
+    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
+            const float *src_block = &tmp_y[r][c];
+            float *dst_block = &grad_y[r][c];
+
+            kernel_sobel_horiz_smooth_4x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride
+            );
+        }
+
+        // Handle remaining right columns with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            const float *row = &tmp_y[rr][0];
+            for (int cc = c; cc < WIDTH - 1; ++cc) {
+                grad_y[rr][cc] = k_smooth0 * row[cc-1] + k_smooth1 * row[cc] + k_smooth0 * row[cc+1];
+            }
+            // Handle right edge
+            grad_y[rr][WIDTH-1] = k_smooth0 * row[WIDTH-2] + k_smooth1 * row[WIDTH-1] + k_smooth0 * row[WIDTH-1];
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        const float *row = &tmp_y[r][0];
+        for (int c = scalar_left; c < WIDTH - 1; ++c) {
+            grad_y[r][c] = k_smooth0 * row[c-1] + k_smooth1 * row[c] + k_smooth0 * row[c+1];
+        }
+        // Handle right edge
+        grad_y[r][WIDTH-1] = k_smooth0 * row[WIDTH-2] + k_smooth1 * row[WIDTH-1] + k_smooth0 * row[WIDTH-1];
+    }
+}
