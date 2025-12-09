@@ -22,6 +22,9 @@ void gaussian_blur_2d_24x80(float input[HEIGHT][WIDTH],
 void gaussian_blur_separable_24x80(float input[HEIGHT][WIDTH],
                                      float output[HEIGHT][WIDTH]);
 
+void gaussian_blur_combined_24x80(float input[HEIGHT][WIDTH],
+                                    float output[HEIGHT][WIDTH]);
+
 void gaussian_blur_reference(float input[HEIGHT][WIDTH],
                              float output[HEIGHT][WIDTH]);
 

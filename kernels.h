@@ -58,6 +58,11 @@ void kernel_conv3_vert_24x80(const float *restrict src, int src_stride,
 void kernel_conv3_horiz_24x80(const float *restrict src, int src_stride,
                                float *restrict dst, int dst_stride);
 
+/* Combined 24x80 kernel (horizontal then vertical, uses tmp buffer) */
+void kernel_conv3_combined_24x80(const float *restrict src, int src_stride,
+                                  float *restrict dst, int dst_stride,
+                                  float *restrict tmp, int tmp_stride);
+
 /* 2D 24x80 convolution kernel (combined horizontal and vertical) */
 void kernel_conv3_2d_24x80(const float *restrict src, int src_stride,
                            float *restrict dst, int dst_stride);

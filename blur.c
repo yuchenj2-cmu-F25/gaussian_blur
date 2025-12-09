@@ -470,6 +470,108 @@ void gaussian_blur_reference(float input[HEIGHT][WIDTH], float output[HEIGHT][WI
 #pragma GCC pop_options
 #endif
 
+void gaussian_blur_combined_24x80(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH]) {
+    const int src_stride = WIDTH;
+    const int dst_stride = WIDTH;
+    const int tmp_stride = 80;
+    const int block_h = 24;
+    const int block_w = 80;
+    const int scalar_left = 8;
+
+    // Temporary buffer for combined kernel (needs 26 rows for 24 output rows)
+    static float tmp_buf[26][80];
+
+    // 1D Gaussian kernel coefficients
+    const float k0f = 0.25f;
+    const float k1f = 0.5f;
+    const float k2f = 0.25f;
+
+    // Handle top row (row 0) with scalar code
+    for (int c = 0; c < WIDTH; ++c) {
+        int c_m1 = (c == 0) ? 0 : (c - 1);
+        int c_p1 = (c == WIDTH - 1) ? (WIDTH - 1) : (c + 1);
+        const float *row = &input[0][0];
+        float h_val = k0f * row[c_m1] + k1f * row[c] + k2f * row[c_p1];
+        output[0][c] = k0f * h_val + k1f * h_val + k2f * (k0f * input[1][c_m1] + k1f * input[1][c] + k2f * input[1][c_p1]);
+    }
+
+    // Handle left columns (0 to scalar_left-1) for rows 1 to HEIGHT-1 with scalar code
+    for (int r = 1; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+
+        for (int c = 0; c < scalar_left; ++c) {
+            int c_m1 = (c == 0) ? 0 : (c - 1);
+            int c_p1 = c + 1;
+
+            // Horizontal blur for 3 rows
+            float h_m1 = k0f * input[r_m1][c_m1] + k1f * input[r_m1][c] + k2f * input[r_m1][c_p1];
+            float h_0  = k0f * input[r][c_m1]    + k1f * input[r][c]    + k2f * input[r][c_p1];
+            float h_p1 = k0f * input[r_p1][c_m1] + k1f * input[r_p1][c] + k2f * input[r_p1][c_p1];
+
+            // Vertical blur
+            output[r][c] = k0f * h_m1 + k1f * h_0 + k2f * h_p1;
+        }
+    }
+
+    // Process bulk with combined 24x80 kernel
+    int r;
+    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
+            const float *src_block = &input[r][c];
+            float *dst_block = &output[r][c];
+
+            kernel_conv3_combined_24x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride,
+                &tmp_buf[0][0],
+                tmp_stride
+            );
+        }
+
+        // Handle remaining right columns for this row block with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            int rr_m1 = rr - 1;
+            int rr_p1 = (rr == HEIGHT - 1) ? (HEIGHT - 1) : (rr + 1);
+
+            for (int cc = c; cc < WIDTH; ++cc) {
+                int cc_m1 = cc - 1;
+                int cc_p1 = (cc == WIDTH - 1) ? (WIDTH - 1) : (cc + 1);
+
+                // Horizontal blur for 3 rows
+                float h_m1 = k0f * input[rr_m1][cc_m1] + k1f * input[rr_m1][cc] + k2f * input[rr_m1][cc_p1];
+                float h_0  = k0f * input[rr][cc_m1]    + k1f * input[rr][cc]    + k2f * input[rr][cc_p1];
+                float h_p1 = k0f * input[rr_p1][cc_m1] + k1f * input[rr_p1][cc] + k2f * input[rr_p1][cc_p1];
+
+                // Vertical blur
+                output[rr][cc] = k0f * h_m1 + k1f * h_0 + k2f * h_p1;
+            }
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+
+        for (int c = scalar_left; c < WIDTH; ++c) {
+            int c_m1 = c - 1;
+            int c_p1 = (c == WIDTH - 1) ? (WIDTH - 1) : (c + 1);
+
+            // Horizontal blur for 3 rows
+            float h_m1 = k0f * input[r_m1][c_m1] + k1f * input[r_m1][c] + k2f * input[r_m1][c_p1];
+            float h_0  = k0f * input[r][c_m1]    + k1f * input[r][c]    + k2f * input[r][c_p1];
+            float h_p1 = k0f * input[r_p1][c_m1] + k1f * input[r_p1][c] + k2f * input[r_p1][c_p1];
+
+            // Vertical blur
+            output[r][c] = k0f * h_m1 + k1f * h_0 + k2f * h_p1;
+        }
+    }
+}
+
 void gaussian_blur_separable_24x80(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH]) {
     const int src_stride = WIDTH;
     const int dst_stride = WIDTH;
