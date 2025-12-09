@@ -41,4 +41,8 @@ void canny_sobel_4x80(float input[HEIGHT][WIDTH],
                       float grad_x[HEIGHT][WIDTH],
                       float grad_y[HEIGHT][WIDTH]);
 
+void canny_sobel_reference(float input[HEIGHT][WIDTH],
+                           float grad_x[HEIGHT][WIDTH],
+                           float grad_y[HEIGHT][WIDTH]);
+
 #endif /* BLUR_H */

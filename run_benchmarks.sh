@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Automated Gaussian Blur Benchmark Script
+# Automated Canny/Sobel Benchmark Script
 # Runs benchmarks with different image dimensions and outputs CSV results
 
 set -e  # Exit on error
@@ -9,14 +9,16 @@ set -e  # Exit on error
 OUTER_RUNS=10  # Number of times to run the entire benchmark suite
 OUTPUT_DIR="benchmark_results"
 
-# Image dimension configurations
+# Image dimension configurations (square images)
 declare -a CONFIGS=(
-    "600:800"   # HEIGHT:WIDTH
-    "300:400"   # HEIGHT:WIDTH
+    "128:128"   # HEIGHT:WIDTH
+    "256:256"
+    "512:512"
+    "1024:1024"
 )
 
 # Benchmark names (must match order in output)
-BENCHMARK_NAMES=("reference" "5x16" "5x16_lowload" "10x8" "4x80")
+BENCHMARK_NAMES=("reference" "canny_sobel_4x80")
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -25,7 +27,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}Gaussian Blur Automated Benchmark${NC}"
+echo -e "${BLUE}Canny/Sobel Automated Benchmark${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -48,8 +50,9 @@ compile_with_dimensions() {
         -DHEIGHT=${height} -DWIDTH=${width} -DRUNS=100 \
         -o blur_benchmark \
         main.c \
-        kernel1/blur.c kernel1/utils.c kernel1/kernels_vert.c kernel1/kernels_horiz.c \
-        kernel1/kernels_vert_10x8.c kernel1/kernels_vert_4x80.c
+        kernel1/blur.c kernel1/utils.c \
+        kernel1/kernels_vert_4x80_macro.c kernel1/kernels_horiz_4x80_macro.c \
+        kernel1/kernels_sobel_4x80_macro.c
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Compilation successful!${NC}"
@@ -68,7 +71,7 @@ run_single_benchmark() {
     echo "  Running benchmark iteration..."
 
     # Run the benchmark in CSV mode and capture output
-    # Output format: reference,5x16,5x16_lowload,10x8,4x80
+    # Output format: reference,canny_sobel_4x80
     local output=$(./blur_benchmark --csv 2>&1)
 
     # Parse CSV output
@@ -101,10 +104,7 @@ for config in "${CONFIGS[@]}"; do
 
     # Arrays to store results from each outer run
     declare -a ref_results=()
-    declare -a b5x16_results=()
-    declare -a b5x16_lowload_results=()
-    declare -a b10x8_results=()
-    declare -a b4x80_results=()
+    declare -a canny_4x80_results=()
 
     # Run benchmark OUTER_RUNS times
     for i in $(seq 1 $OUTER_RUNS); do
@@ -113,17 +113,14 @@ for config in "${CONFIGS[@]}"; do
         # Run single benchmark and parse CSV results
         csv_line=$(run_single_benchmark "$HEIGHT" "$WIDTH")
 
-        # Parse CSV: reference,5x16,5x16_lowload,10x8,4x80
-        IFS=',' read -r ref b5x16 b5x16_low b10x8 b4x80 <<< "$csv_line"
+        # Parse CSV: reference,canny_sobel_4x80
+        IFS=',' read -r ref canny_4x80 <<< "$csv_line"
 
         # Store results
         ref_results+=("$ref")
-        b5x16_results+=("$b5x16")
-        b5x16_lowload_results+=("$b5x16_low")
-        b10x8_results+=("$b10x8")
-        b4x80_results+=("$b4x80")
+        canny_4x80_results+=("$canny_4x80")
 
-        echo "    Results: ref=$ref, 5x16=$b5x16, 5x16_low=$b5x16_low, 10x8=$b10x8, 4x80=$b4x80"
+        echo "    Results: ref=$ref, canny_4x80=$canny_4x80"
     done
 
     # Calculate averages
@@ -131,10 +128,7 @@ for config in "${CONFIGS[@]}"; do
     echo -e "${GREEN}Calculating averages across $OUTER_RUNS runs...${NC}"
 
     avg_ref=$(calculate_average "${ref_results[@]}")
-    avg_5x16=$(calculate_average "${b5x16_results[@]}")
-    avg_5x16_lowload=$(calculate_average "${b5x16_lowload_results[@]}")
-    avg_10x8=$(calculate_average "${b10x8_results[@]}")
-    avg_4x80=$(calculate_average "${b4x80_results[@]}")
+    avg_canny_4x80=$(calculate_average "${canny_4x80_results[@]}")
 
     # Generate CSV filename
     csv_file="${OUTPUT_DIR}/benchmark_${HEIGHT}x${WIDTH}.csv"
@@ -145,10 +139,7 @@ for config in "${CONFIGS[@]}"; do
     cat > "$csv_file" << EOF
 Benchmark,FLOPS_per_Cycle
 reference,$avg_ref
-5x16,$avg_5x16
-5x16_lowload,$avg_5x16_lowload
-10x8,$avg_10x8
-4x80,$avg_4x80
+canny_sobel_4x80,$avg_canny_4x80
 EOF
 
     echo ""
@@ -157,10 +148,7 @@ EOF
 
     # Clean up arrays for next iteration
     unset ref_results
-    unset b5x16_results
-    unset b5x16_lowload_results
-    unset b10x8_results
-    unset b4x80_results
+    unset canny_4x80_results
 done
 
 # Clean up

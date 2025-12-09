@@ -627,6 +627,156 @@ void gaussian_blur_reference(float input[HEIGHT][WIDTH], float output[HEIGHT][WI
 #pragma GCC pop_options
 #endif
 
+// Scalar reference implementation for Canny/Sobel pipeline
+// Disable auto-vectorization for true scalar baseline
+#ifdef __GNUC__
+#pragma GCC push_options
+#pragma GCC optimize ("no-tree-vectorize")
+#endif
+
+#ifdef __clang__
+#pragma clang optimize off
+#endif
+
+void canny_sobel_reference(float input[HEIGHT][WIDTH],
+                           float grad_x[HEIGHT][WIDTH],
+                           float grad_y[HEIGHT][WIDTH])
+{
+    // Gaussian kernel: [0.25, 0.5, 0.25]
+    const float k0f = 0.25f, k1f = 0.5f, k2f = 0.25f;
+
+    // Sobel smoothing kernel: [1, 2, 1]
+    const float s0 = 1.0f, s1 = 2.0f;
+
+    // Sobel derivative kernel: [-1, 0, 1]
+    const float d0 = -1.0f, d1 = 1.0f;
+
+    static float blurred[HEIGHT][WIDTH];
+    static float tmp_horiz[HEIGHT][WIDTH];
+    static float tmp_x[HEIGHT][WIDTH];
+    static float tmp_y[HEIGHT][WIDTH];
+
+    // ========== STEP 1: GAUSSIAN BLUR ==========
+
+    // Horizontal Gaussian pass
+    for (int r = 0; r < HEIGHT; ++r) {
+        volatile const float *row = &input[r][0];
+        volatile float *dst = &tmp_horiz[r][0];
+
+        // Handle left edge
+        dst[0] = k0f * row[0] + k1f * row[0] + k2f * row[1];
+
+        // Inner loop - volatile pointers prevent auto-vectorization
+        #ifdef __clang__
+        #pragma clang loop vectorize(disable)
+        #endif
+        for (int c = 1; c < WIDTH - 1; ++c) {
+            dst[c] = k0f * row[c-1] + k1f * row[c] + k2f * row[c+1];
+        }
+
+        // Handle right edge
+        dst[WIDTH - 1] = k0f * row[WIDTH - 2] + k1f * row[WIDTH - 1] + k2f * row[WIDTH - 1];
+    }
+
+    // Vertical Gaussian pass
+    for (int r = 0; r < HEIGHT; ++r) {
+        int rm1 = (r == 0) ? 0 : (r - 1);
+        int rp1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        volatile const float *row_m1 = &tmp_horiz[rm1][0];
+        volatile const float *row_0  = &tmp_horiz[r][0];
+        volatile const float *row_p1 = &tmp_horiz[rp1][0];
+        volatile float *dst = &blurred[r][0];
+
+        #ifdef __clang__
+        #pragma clang loop vectorize(disable)
+        #endif
+        for (int c = 0; c < WIDTH; ++c) {
+            dst[c] = k0f * row_m1[c] + k1f * row_0[c] + k2f * row_p1[c];
+        }
+    }
+
+    // ========== STEP 2: SOBEL X (VERTICAL EDGES) ==========
+    // Vertical smoothing pass [1, 2, 1]
+    for (int r = 0; r < HEIGHT; ++r) {
+        int rm1 = (r == 0) ? 0 : (r - 1);
+        int rp1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        volatile const float *row_m1 = &blurred[rm1][0];
+        volatile const float *row_0  = &blurred[r][0];
+        volatile const float *row_p1 = &blurred[rp1][0];
+        volatile float *dst = &tmp_x[r][0];
+
+        #ifdef __clang__
+        #pragma clang loop vectorize(disable)
+        #endif
+        for (int c = 0; c < WIDTH; ++c) {
+            dst[c] = s0 * row_m1[c] + s1 * row_0[c] + s0 * row_p1[c];
+        }
+    }
+
+    // Horizontal derivative pass [-1, 0, 1]
+    for (int r = 0; r < HEIGHT; ++r) {
+        volatile const float *row = &tmp_x[r][0];
+        volatile float *dst = &grad_x[r][0];
+
+        // Handle left edge (clamp to left boundary)
+        dst[0] = d0 * row[0] + d1 * row[1];
+
+        #ifdef __clang__
+        #pragma clang loop vectorize(disable)
+        #endif
+        for (int c = 1; c < WIDTH - 1; ++c) {
+            dst[c] = d0 * row[c-1] + d1 * row[c+1];
+        }
+
+        // Handle right edge
+        dst[WIDTH - 1] = d0 * row[WIDTH - 2] + d1 * row[WIDTH - 1];
+    }
+
+    // ========== STEP 3: SOBEL Y (HORIZONTAL EDGES) ==========
+    // Vertical derivative pass [-1, 0, 1]
+    for (int r = 0; r < HEIGHT; ++r) {
+        int rm1 = (r == 0) ? 0 : (r - 1);
+        int rp1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        volatile const float *row_m1 = &blurred[rm1][0];
+        volatile const float *row_p1 = &blurred[rp1][0];
+        volatile float *dst = &tmp_y[r][0];
+
+        #ifdef __clang__
+        #pragma clang loop vectorize(disable)
+        #endif
+        for (int c = 0; c < WIDTH; ++c) {
+            dst[c] = d0 * row_m1[c] + d1 * row_p1[c];
+        }
+    }
+
+    // Horizontal smoothing pass [1, 2, 1]
+    for (int r = 0; r < HEIGHT; ++r) {
+        volatile const float *row = &tmp_y[r][0];
+        volatile float *dst = &grad_y[r][0];
+
+        // Handle left edge
+        dst[0] = s0 * row[0] + s1 * row[0] + s0 * row[1];
+
+        #ifdef __clang__
+        #pragma clang loop vectorize(disable)
+        #endif
+        for (int c = 1; c < WIDTH - 1; ++c) {
+            dst[c] = s0 * row[c-1] + s1 * row[c] + s0 * row[c+1];
+        }
+
+        // Handle right edge
+        dst[WIDTH - 1] = s0 * row[WIDTH - 2] + s1 * row[WIDTH - 1] + s0 * row[WIDTH - 1];
+    }
+}
+
+#ifdef __clang__
+#pragma clang optimize on
+#endif
+
+#ifdef __GNUC__
+#pragma GCC pop_options
+#endif
+
 void gaussian_blur_combined_24x80(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH]) {
     const int src_stride = WIDTH;
     const int dst_stride = WIDTH;

@@ -32,6 +32,8 @@ int main(int argc, char *argv[]) {
     // Gradient maps for Canny/Sobel
     static float grad_x[HEIGHT][WIDTH];
     static float grad_y[HEIGHT][WIDTH];
+    static float grad_x_ref[HEIGHT][WIDTH];
+    static float grad_y_ref[HEIGHT][WIDTH];
 
 
 
@@ -61,33 +63,35 @@ int main(int argc, char *argv[]) {
 
 
     // Benchmark reference (for correctness and as scalar baseline)
-    gaussian_blur_reference(input, reference);
+    canny_sobel_reference(input, grad_x_ref, grad_y_ref);
 
     if (!csv_mode) {
         t0 = rdtsc();
-        gaussian_blur_reference(input, reference);
+        canny_sobel_reference(input, grad_x_ref, grad_y_ref);
         t1 = rdtsc();
         cycles = (double)(t1 - t0);
-        printf("Gaussian blur reference took %.0f cycles\n", cycles);
+        printf("Canny/Sobel reference took %.0f cycles\n", cycles);
     }
 
     sums = .0f;
     for (size_t i = 0; i < RUNS; ++i) {
         t0 = rdtsc();
-        gaussian_blur_reference(input, reference);
+        canny_sobel_reference(input, grad_x_ref, grad_y_ref);
         t1 = rdtsc();
         sums += (double)(t1 - t0);
     }
-    flops_reference = (12.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    flops_reference = (32.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
     if (!csv_mode) {
-        printf("Gaussian blur reference average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf("Canny/Sobel reference average took %.0f cycles\n", sums/(1.0*RUNS));
         printf(" %lf\n", flops_reference);
     }
 
     // Check correctness
     if (!csv_mode) {
-        float diff = compare_images(reference, output);
-        printf("Average difference from reference: %.6f\n", diff);
+        float diff_x = compare_images(grad_x_ref, grad_x);
+        float diff_y = compare_images(grad_y_ref, grad_y);
+        printf("Average difference grad_x from reference: %.6f\n", diff_x);
+        printf("Average difference grad_y from reference: %.6f\n", diff_y);
     }
 
     // CSV output mode: print single line with all FLOPS/cycle values
