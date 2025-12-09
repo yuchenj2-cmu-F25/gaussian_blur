@@ -13,8 +13,6 @@ int main(int argc, char *argv[]) {
         csv_mode = 1;
     }
     static float input[HEIGHT][WIDTH];
-    static float output[HEIGHT][WIDTH];
-    static float reference[HEIGHT][WIDTH];
 
     srand((unsigned)time(NULL));
     fill_random_image(input);
