@@ -3,7 +3,7 @@
 # ------------------------------------------------------------
 
 CC      := gcc
-CFLAGS  := -O3 -march=native -Wall -Wextra -Ikernel1
+CFLAGS  := -O3 -march=native -Wall -Wextra -fopenmp -Ikernel1
 TARGET  := blur_test
 SRCS    := main.c $(wildcard kernel1/*.c)
 OBJS    := $(SRCS:.c=.o)
