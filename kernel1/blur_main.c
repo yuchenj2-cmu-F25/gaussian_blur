@@ -5,10 +5,6 @@
 #include "kernels.h"
 #include "config.h"
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
-
 void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
                         float output[HEIGHT][WIDTH])
 {
@@ -47,20 +43,8 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Process bulk vertical with 4x96 kernel
-    const int vert_start = 1;
-    int vert_bottom_start;
-    {
-        int range = HEIGHT - vert_start;
-        if (range <= 0) {
-            vert_bottom_start = vert_start;
-        } else {
-            int remainder = range % block_h;
-            vert_bottom_start = HEIGHT - remainder;
-        }
-    }
-
-    #pragma omp parallel for
-    for (int r = vert_start; r < vert_bottom_start; r += block_h) {
+    int r;
+    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
             const float *src_block = &input[r][c];
@@ -89,7 +73,7 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (int r = vert_bottom_start; r < HEIGHT; ++r) {
+    for (; r < HEIGHT; ++r) {
         int r_m1 = r - 1;
         int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
         const float *row_m1 = &input[r_m1][0];
@@ -116,20 +100,7 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Process bulk horizontal with 4x96 kernel
-    const int horiz_start = 0;
-    int horiz_bottom_start;
-    {
-        int range = HEIGHT - horiz_start;
-        if (range <= 0) {
-            horiz_bottom_start = horiz_start;
-        } else {
-            int remainder = range % block_h;
-            horiz_bottom_start = HEIGHT - remainder;
-        }
-    }
-
-    #pragma omp parallel for
-    for (int r = horiz_start; r < horiz_bottom_start; r += block_h) {
+    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
             const float *src_block = &tmp[r][c];
@@ -155,7 +126,7 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (int r = horiz_bottom_start; r < HEIGHT; ++r) {
+    for (; r < HEIGHT; ++r) {
         const float *row = &tmp[r][0];
         for (int c = scalar_left; c < WIDTH - 1; ++c) {
             output[r][c] = k0f * row[c-1] + k1f * row[c] + k2f * row[c+1];
