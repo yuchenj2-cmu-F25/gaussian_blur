@@ -2,11 +2,11 @@
 #include <stddef.h>
 #include "kernels.h"
 
-// 4x80 kernel: processes 4 rows, 80 columns (10 accumulators × 8 floats each)
+// 24x80 vertical kernel: processes 24 rows, 80 columns (10 accumulators × 8 floats each)
 // Macro-based version to eliminate code repetition
 
-void kernel_conv3_vert_4x80(const float *restrict src, int src_stride,
-                        float *restrict dst, int dst_stride)
+void kernel_conv3_vert_24x80(const float *restrict src, int src_stride,
+                              float *restrict dst, int dst_stride)
 {
     __m256 ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9;
     const __m256 ymm13=_mm256_set1_ps(0.25f), ymm14=_mm256_set1_ps(0.5f);
@@ -56,11 +56,31 @@ void kernel_conv3_vert_4x80(const float *restrict src, int src_stride,
         LOAD_AND_ACCUMULATE((row)+1, ymm13) \
         STORE_OUTPUT_ROW(row)
 
-    // Compute all 4 output rows
+    // Compute all 24 output rows
     COMPUTE_OUTPUT_ROW(0)
     COMPUTE_OUTPUT_ROW(1)
     COMPUTE_OUTPUT_ROW(2)
     COMPUTE_OUTPUT_ROW(3)
+    COMPUTE_OUTPUT_ROW(4)
+    COMPUTE_OUTPUT_ROW(5)
+    COMPUTE_OUTPUT_ROW(6)
+    COMPUTE_OUTPUT_ROW(7)
+    COMPUTE_OUTPUT_ROW(8)
+    COMPUTE_OUTPUT_ROW(9)
+    COMPUTE_OUTPUT_ROW(10)
+    COMPUTE_OUTPUT_ROW(11)
+    COMPUTE_OUTPUT_ROW(12)
+    COMPUTE_OUTPUT_ROW(13)
+    COMPUTE_OUTPUT_ROW(14)
+    COMPUTE_OUTPUT_ROW(15)
+    COMPUTE_OUTPUT_ROW(16)
+    COMPUTE_OUTPUT_ROW(17)
+    COMPUTE_OUTPUT_ROW(18)
+    COMPUTE_OUTPUT_ROW(19)
+    COMPUTE_OUTPUT_ROW(20)
+    COMPUTE_OUTPUT_ROW(21)
+    COMPUTE_OUTPUT_ROW(22)
+    COMPUTE_OUTPUT_ROW(23)
 
     // Clean up macros
     #undef COMPUTE_OUTPUT_ROW
