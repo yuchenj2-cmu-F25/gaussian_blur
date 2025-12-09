@@ -1,7 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define WIDTH  512
+#define WIDTH  800
 #define HEIGHT 600
 #define RUNS 100
 

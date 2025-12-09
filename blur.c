@@ -730,3 +730,37 @@ void gaussian_blur(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH]) {
         }
     }
 }
+
+void gaussian_blur_faster(float input[HEIGHT][WIDTH], float output[HEIGHT][WIDTH]) {
+    const float k0f = 0.25f, k1f = 0.5f, k2f = 0.25f;
+    static float tmp[HEIGHT][WIDTH];
+
+    for (int r = 0; r < HEIGHT; ++r) {
+        const float *row = &input[r][0];
+        float *dst = &tmp[r][0];
+
+        // Handle left edge
+        dst[0] = k0f * row[0] + k1f * row[0] + k2f * row[1];
+
+        // Vectorizable, branchless main body
+        for (int c = 1; c < WIDTH - 1; ++c) {
+            dst[c] = k0f * row[c-1] + k1f * row[c] + k2f * row[c+1];
+        }
+
+        // Handle right edge
+        dst[WIDTH - 1] = k0f * row[WIDTH - 2] + k1f * row[WIDTH - 1] + k2f * row[WIDTH - 1];
+    }
+
+    for (int r = 0; r < HEIGHT; ++r) {
+        int rm1 = (r == 0) ? 0 : (r - 1);
+        int rp1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &tmp[rm1][0];
+        const float *row_0  = &tmp[r][0];
+        const float *row_p1 = &tmp[rp1][0];
+        float *dst = &output[r][0];
+
+        for (int c = 0; c < WIDTH; ++c) {
+            dst[c] = k0f * row_m1[c] + k1f * row_0[c] + k2f * row_p1[c];
+        }
+    }
+}

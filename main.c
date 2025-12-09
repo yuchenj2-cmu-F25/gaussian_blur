@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
 
     if (!csv_mode) {
         t0 = rdtsc();
-        gaussian_blur_reference(input, reference);
+        gaussian_blur_faster(input, reference);
         t1 = rdtsc();
         cycles = (double)(t1 - t0);
         printf("Gaussian blur reference took %.0f cycles\n", cycles);
@@ -208,7 +208,7 @@ int main(int argc, char *argv[]) {
     sums = .0f;
     for (size_t i = 0; i < RUNS; ++i) {
         t0 = rdtsc();
-        gaussian_blur_reference(input, reference);
+        gaussian_blur_faster(input, reference);
         t1 = rdtsc();
         sums += (double)(t1 - t0);
     }

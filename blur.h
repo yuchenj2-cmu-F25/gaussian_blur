@@ -27,5 +27,8 @@ void gaussian_blur_reference(float input[HEIGHT][WIDTH],
 
 void gaussian_blur(float input[HEIGHT][WIDTH],
                    float output[HEIGHT][WIDTH]);
+                   
+void gaussian_blur_faster(float input[HEIGHT][WIDTH],
+                          float output[HEIGHT][WIDTH]);
 
 #endif /* BLUR_H */
