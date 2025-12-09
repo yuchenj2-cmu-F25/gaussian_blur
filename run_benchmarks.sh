@@ -18,7 +18,7 @@ declare -a CONFIGS=(
 )
 
 # Benchmark names (must match order in output)
-BENCHMARK_NAMES=("reference" "canny_sobel_4x80")
+BENCHMARK_NAMES=("gaussian_ref" "sobel_ref" "pipeline_ref" "gaussian_4x80" "sobel_4x80" "pipeline_4x80")
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -50,7 +50,7 @@ compile_with_dimensions() {
         -DHEIGHT=${height} -DWIDTH=${width} -DRUNS=100 \
         -o blur_benchmark \
         main.c \
-        kernel1/blur.c kernel1/utils.c \
+        kernel1/blur_main.c kernel1/utils.c \
         kernel1/kernels_vert_4x80_macro.c kernel1/kernels_horiz_4x80_macro.c \
         kernel1/kernels_sobel_4x80_macro.c
 
@@ -71,7 +71,7 @@ run_single_benchmark() {
     echo "  Running benchmark iteration..."
 
     # Run the benchmark in CSV mode and capture output
-    # Output format: reference,canny_sobel_4x80
+    # Output format: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x80,sobel_4x80,pipeline_4x80
     local output=$(./blur_benchmark --csv 2>&1)
 
     # Parse CSV output
@@ -103,8 +103,12 @@ for config in "${CONFIGS[@]}"; do
     compile_with_dimensions "$HEIGHT" "$WIDTH"
 
     # Arrays to store results from each outer run
-    declare -a ref_results=()
-    declare -a canny_4x80_results=()
+    declare -a gaussian_ref_results=()
+    declare -a sobel_ref_results=()
+    declare -a pipeline_ref_results=()
+    declare -a gaussian_4x80_results=()
+    declare -a sobel_4x80_results=()
+    declare -a pipeline_4x80_results=()
 
     # Run benchmark OUTER_RUNS times
     for i in $(seq 1 $OUTER_RUNS); do
@@ -113,22 +117,30 @@ for config in "${CONFIGS[@]}"; do
         # Run single benchmark and parse CSV results
         csv_line=$(run_single_benchmark "$HEIGHT" "$WIDTH")
 
-        # Parse CSV: reference,canny_sobel_4x80
-        IFS=',' read -r ref canny_4x80 <<< "$csv_line"
+        # Parse CSV: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x80,sobel_4x80,pipeline_4x80
+        IFS=',' read -r g_ref s_ref p_ref g_4x80 s_4x80 p_4x80 <<< "$csv_line"
 
         # Store results
-        ref_results+=("$ref")
-        canny_4x80_results+=("$canny_4x80")
+        gaussian_ref_results+=("$g_ref")
+        sobel_ref_results+=("$s_ref")
+        pipeline_ref_results+=("$p_ref")
+        gaussian_4x80_results+=("$g_4x80")
+        sobel_4x80_results+=("$s_4x80")
+        pipeline_4x80_results+=("$p_4x80")
 
-        echo "    Results: ref=$ref, canny_4x80=$canny_4x80"
+        echo "    Ref: g=$g_ref, s=$s_ref, p=$p_ref | 4x80: g=$g_4x80, s=$s_4x80, p=$p_4x80"
     done
 
     # Calculate averages
     echo ""
     echo -e "${GREEN}Calculating averages across $OUTER_RUNS runs...${NC}"
 
-    avg_ref=$(calculate_average "${ref_results[@]}")
-    avg_canny_4x80=$(calculate_average "${canny_4x80_results[@]}")
+    avg_gaussian_ref=$(calculate_average "${gaussian_ref_results[@]}")
+    avg_sobel_ref=$(calculate_average "${sobel_ref_results[@]}")
+    avg_pipeline_ref=$(calculate_average "${pipeline_ref_results[@]}")
+    avg_gaussian_4x80=$(calculate_average "${gaussian_4x80_results[@]}")
+    avg_sobel_4x80=$(calculate_average "${sobel_4x80_results[@]}")
+    avg_pipeline_4x80=$(calculate_average "${pipeline_4x80_results[@]}")
 
     # Generate CSV filename
     csv_file="${OUTPUT_DIR}/benchmark_${HEIGHT}x${WIDTH}.csv"
@@ -138,8 +150,12 @@ for config in "${CONFIGS[@]}"; do
 
     cat > "$csv_file" << EOF
 Benchmark,FLOPS_per_Cycle
-reference,$avg_ref
-canny_sobel_4x80,$avg_canny_4x80
+gaussian_ref,$avg_gaussian_ref
+sobel_ref,$avg_sobel_ref
+pipeline_ref,$avg_pipeline_ref
+gaussian_4x80,$avg_gaussian_4x80
+sobel_4x80,$avg_sobel_4x80
+pipeline_4x80,$avg_pipeline_4x80
 EOF
 
     echo ""
@@ -147,8 +163,12 @@ EOF
     cat "$csv_file"
 
     # Clean up arrays for next iteration
-    unset ref_results
-    unset canny_4x80_results
+    unset gaussian_ref_results
+    unset sobel_ref_results
+    unset pipeline_ref_results
+    unset gaussian_4x80_results
+    unset sobel_4x80_results
+    unset pipeline_4x80_results
 done
 
 # Clean up

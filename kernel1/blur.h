@@ -37,12 +37,12 @@ void gaussian_blur(float input[HEIGHT][WIDTH],
 void gaussian_blur_faster(float input[HEIGHT][WIDTH],
                           float output[HEIGHT][WIDTH]);
 
-void canny_sobel_4x80(float input[HEIGHT][WIDTH],
-                      float grad_x[HEIGHT][WIDTH],
-                      float grad_y[HEIGHT][WIDTH]);
+void sobel_4x80(float blurred[HEIGHT][WIDTH],
+                float grad_x[HEIGHT][WIDTH],
+                float grad_y[HEIGHT][WIDTH]);
 
-void canny_sobel_reference(float input[HEIGHT][WIDTH],
-                           float grad_x[HEIGHT][WIDTH],
-                           float grad_y[HEIGHT][WIDTH]);
+void sobel_reference(float blurred[HEIGHT][WIDTH],
+                     float grad_x[HEIGHT][WIDTH],
+                     float grad_y[HEIGHT][WIDTH]);
 
 #endif /* BLUR_H */
