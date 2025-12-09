@@ -66,6 +66,10 @@ void kernel_conv3_vert_4x80(const float *restrict src, int src_stride,
     COMPUTE_OUTPUT_ROW(1)
     COMPUTE_OUTPUT_ROW(2)
     COMPUTE_OUTPUT_ROW(3)
+    // COMPUTE_OUTPUT_ROW(4)
+    // COMPUTE_OUTPUT_ROW(5)
+    // COMPUTE_OUTPUT_ROW(6)
+    // COMPUTE_OUTPUT_ROW(7)
 
     // Clean up macros
     #undef COMPUTE_OUTPUT_ROW
