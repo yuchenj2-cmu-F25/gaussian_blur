@@ -14,12 +14,18 @@ void kernel_conv3_vert_24x80(const float *restrict src, int src_stride,
 
     #define ROWCOL(s,t) (src + (s)*(ptrdiff_t)src_stride + (t)*(ptrdiff_t)1)
 
-    // Macro to zero all accumulators
-    #define ZERO_ACCUMULATORS() \
-        ymm0=_mm256_setzero_ps(); ymm1=_mm256_setzero_ps(); ymm2=_mm256_setzero_ps(); \
-        ymm3=_mm256_setzero_ps(); ymm4=_mm256_setzero_ps(); ymm5=_mm256_setzero_ps(); \
-        ymm6=_mm256_setzero_ps(); ymm7=_mm256_setzero_ps(); ymm8=_mm256_setzero_ps(); \
-        ymm9=_mm256_setzero_ps();
+    // Macro to load and initialize accumulators (first load, no accumulation)
+    #define LOAD_AND_INIT(row, coeff) \
+        ymm0=_mm256_loadu_ps(ROWCOL(row,0));  ymm0=_mm256_mul_ps(coeff,ymm0); \
+        ymm1=_mm256_loadu_ps(ROWCOL(row,8));  ymm1=_mm256_mul_ps(coeff,ymm1); \
+        ymm2=_mm256_loadu_ps(ROWCOL(row,16)); ymm2=_mm256_mul_ps(coeff,ymm2); \
+        ymm3=_mm256_loadu_ps(ROWCOL(row,24)); ymm3=_mm256_mul_ps(coeff,ymm3); \
+        ymm4=_mm256_loadu_ps(ROWCOL(row,32)); ymm4=_mm256_mul_ps(coeff,ymm4); \
+        ymm5=_mm256_loadu_ps(ROWCOL(row,40)); ymm5=_mm256_mul_ps(coeff,ymm5); \
+        ymm6=_mm256_loadu_ps(ROWCOL(row,48)); ymm6=_mm256_mul_ps(coeff,ymm6); \
+        ymm7=_mm256_loadu_ps(ROWCOL(row,56)); ymm7=_mm256_mul_ps(coeff,ymm7); \
+        ymm8=_mm256_loadu_ps(ROWCOL(row,64)); ymm8=_mm256_mul_ps(coeff,ymm8); \
+        ymm9=_mm256_loadu_ps(ROWCOL(row,72)); ymm9=_mm256_mul_ps(coeff,ymm9);
 
     // Macro to load and accumulate one source row with a coefficient
     #define LOAD_AND_ACCUMULATE(row, coeff) \
@@ -50,8 +56,7 @@ void kernel_conv3_vert_24x80(const float *restrict src, int src_stride,
     // Macro to compute one complete output row
     // Each output row uses 3 input rows: (row-1, row, row+1) with coefficients (0.25, 0.5, 0.25)
     #define COMPUTE_OUTPUT_ROW(row) \
-        ZERO_ACCUMULATORS() \
-        LOAD_AND_ACCUMULATE((row)-1, ymm13) \
+        LOAD_AND_INIT((row)-1, ymm13) \
         LOAD_AND_ACCUMULATE((row),   ymm14) \
         LOAD_AND_ACCUMULATE((row)+1, ymm13) \
         STORE_OUTPUT_ROW(row)
@@ -86,6 +91,6 @@ void kernel_conv3_vert_24x80(const float *restrict src, int src_stride,
     #undef COMPUTE_OUTPUT_ROW
     #undef STORE_OUTPUT_ROW
     #undef LOAD_AND_ACCUMULATE
-    #undef ZERO_ACCUMULATORS
+    #undef LOAD_AND_INIT
     #undef ROWCOL
 }
