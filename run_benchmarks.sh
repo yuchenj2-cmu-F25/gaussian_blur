@@ -68,8 +68,6 @@ run_single_benchmark() {
     local height=$1
     local width=$2
 
-    echo "  Running benchmark iteration..."
-
     # Run the benchmark in CSV mode and capture output
     # Output format: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x80,sobel_4x80,pipeline_4x80
     local output=$(./blur_benchmark --csv 2>&1)
