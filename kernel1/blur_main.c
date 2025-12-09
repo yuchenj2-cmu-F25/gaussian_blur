@@ -48,10 +48,19 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
 
     // Process bulk vertical with 4x96 kernel
     const int vert_start = 1;
-    const int vert_bottom_start = vert_start + ((HEIGHT - vert_start) / block_h) * block_h;
+    int vert_bottom_start;
+    {
+        int range = HEIGHT - vert_start;
+        if (range <= 0) {
+            vert_bottom_start = vert_start;
+        } else {
+            int remainder = range % block_h;
+            vert_bottom_start = HEIGHT - remainder;
+        }
+    }
 
     #pragma omp parallel for
-    for (int r = vert_start; r + block_h <= HEIGHT; r += block_h) {
+    for (int r = vert_start; r < vert_bottom_start; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
             const float *src_block = &input[r][c];
@@ -108,10 +117,19 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
 
     // Process bulk horizontal with 4x96 kernel
     const int horiz_start = 0;
-    const int horiz_bottom_start = (HEIGHT / block_h) * block_h;
+    int horiz_bottom_start;
+    {
+        int range = HEIGHT - horiz_start;
+        if (range <= 0) {
+            horiz_bottom_start = horiz_start;
+        } else {
+            int remainder = range % block_h;
+            horiz_bottom_start = HEIGHT - remainder;
+        }
+    }
 
     #pragma omp parallel for
-    for (int r = horiz_start; r + block_h <= HEIGHT; r += block_h) {
+    for (int r = horiz_start; r < horiz_bottom_start; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
             const float *src_block = &tmp[r][c];
