@@ -2,13 +2,13 @@
 #include <stddef.h>
 #include "kernels.h"
 
-// 4x80 horizontal kernel: processes 4 rows, 80 columns (10 accumulators × 8 floats each)
+// 4x96 horizontal kernel: processes 4 rows, 80 columns (10 accumulators × 8 floats each)
 // Macro-based version to eliminate code repetition
 
-void kernel_conv3_horiz_4x80(const float *restrict src, int src_stride,
+void kernel_conv3_horiz_4x96(const float *restrict src, int src_stride,
                               float *restrict dst, int dst_stride)
 {
-    __m256 ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9;
+    __m256 ymm0, ymm1, ymm2, ymm3, ymm4, ymm5, ymm6, ymm7, ymm8, ymm9, ymm10, ymm11;
     const __m256 ymm13=_mm256_set1_ps(0.25f), ymm14=_mm256_set1_ps(0.5f);
     __m256 ymm15;
 
@@ -25,7 +25,9 @@ void kernel_conv3_horiz_4x80(const float *restrict src, int src_stride,
         ymm6=_mm256_loadu_ps(ROWCOL(row,(col_offset)+48)); ymm6=_mm256_mul_ps(coeff,ymm6); \
         ymm7=_mm256_loadu_ps(ROWCOL(row,(col_offset)+56)); ymm7=_mm256_mul_ps(coeff,ymm7); \
         ymm8=_mm256_loadu_ps(ROWCOL(row,(col_offset)+64)); ymm8=_mm256_mul_ps(coeff,ymm8); \
-        ymm9=_mm256_loadu_ps(ROWCOL(row,(col_offset)+72)); ymm9=_mm256_mul_ps(coeff,ymm9);
+        ymm9=_mm256_loadu_ps(ROWCOL(row,(col_offset)+72)); ymm9=_mm256_mul_ps(coeff,ymm9); \
+        ymm10=_mm256_loadu_ps(ROWCOL(row,(col_offset)+80)); ymm10=_mm256_mul_ps(coeff,ymm10); \
+        ymm11=_mm256_loadu_ps(ROWCOL(row,(col_offset)+88)); ymm11=_mm256_mul_ps(coeff,ymm11);
 
     // Macro to load and accumulate with horizontal offset and coefficient
     #define LOAD_AND_ACCUMULATE(row, col_offset, coeff) \
@@ -38,7 +40,9 @@ void kernel_conv3_horiz_4x80(const float *restrict src, int src_stride,
         ymm15=_mm256_loadu_ps(ROWCOL(row,(col_offset)+48)); ymm6=_mm256_fmadd_ps(coeff,ymm15,ymm6); \
         ymm15=_mm256_loadu_ps(ROWCOL(row,(col_offset)+56)); ymm7=_mm256_fmadd_ps(coeff,ymm15,ymm7); \
         ymm15=_mm256_loadu_ps(ROWCOL(row,(col_offset)+64)); ymm8=_mm256_fmadd_ps(coeff,ymm15,ymm8); \
-        ymm15=_mm256_loadu_ps(ROWCOL(row,(col_offset)+72)); ymm9=_mm256_fmadd_ps(coeff,ymm15,ymm9);
+        ymm15=_mm256_loadu_ps(ROWCOL(row,(col_offset)+72)); ymm9=_mm256_fmadd_ps(coeff,ymm15,ymm9); \
+        ymm15=_mm256_loadu_ps(ROWCOL(row,(col_offset)+80)); ymm10=_mm256_fmadd_ps(coeff,ymm15,ymm10); \
+        ymm15=_mm256_loadu_ps(ROWCOL(row,(col_offset)+88)); ymm11=_mm256_fmadd_ps(coeff,ymm15,ymm11);
 
     // Macro to store all accumulators to an output row
     #define STORE_OUTPUT_ROW(row) \
@@ -51,7 +55,9 @@ void kernel_conv3_horiz_4x80(const float *restrict src, int src_stride,
         _mm256_storeu_ps(dst+(row)*dst_stride+48, ymm6); \
         _mm256_storeu_ps(dst+(row)*dst_stride+56, ymm7); \
         _mm256_storeu_ps(dst+(row)*dst_stride+64, ymm8); \
-        _mm256_storeu_ps(dst+(row)*dst_stride+72, ymm9);
+        _mm256_storeu_ps(dst+(row)*dst_stride+72, ymm9); \
+        _mm256_storeu_ps(dst+(row)*dst_stride+80, ymm10); \
+        _mm256_storeu_ps(dst+(row)*dst_stride+88, ymm11);
 
     // Macro to compute one complete output row with horizontal convolution
     // Each output row uses 3 column offsets: (col-1, col, col+1) with coefficients (0.25, 0.5, 0.25)
@@ -70,6 +76,14 @@ void kernel_conv3_horiz_4x80(const float *restrict src, int src_stride,
     // COMPUTE_OUTPUT_ROW(5)
     // COMPUTE_OUTPUT_ROW(6)
     // COMPUTE_OUTPUT_ROW(7)
+    // COMPUTE_OUTPUT_ROW(8+0)
+    // COMPUTE_OUTPUT_ROW(8+1)
+    // COMPUTE_OUTPUT_ROW(8+2)
+    // COMPUTE_OUTPUT_ROW(8+3)
+    // COMPUTE_OUTPUT_ROW(8+4)
+    // COMPUTE_OUTPUT_ROW(8+5)
+    // COMPUTE_OUTPUT_ROW(8+6)
+    // COMPUTE_OUTPUT_ROW(8+7)
 
     // Clean up macros
     #undef COMPUTE_OUTPUT_ROW

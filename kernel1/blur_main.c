@@ -5,13 +5,13 @@
 #include "kernels.h"
 #include "config.h"
 
-void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
+void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
                         float output[HEIGHT][WIDTH])
 {
     const int src_stride = WIDTH;
     const int dst_stride = WIDTH;
     const int block_h = 4;
-    const int block_w = 80;
+    const int block_w = 96;
     const int scalar_left = 8; // multiple of 8 for optimization
 
     static float tmp[HEIGHT][WIDTH];
@@ -42,7 +42,7 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
         }
     }
 
-    // Process bulk vertical with 4x80 kernel
+    // Process bulk vertical with 4x96 kernel
     int r;
     for (r = 1; r + block_h <= HEIGHT; r += block_h) {
         int c;
@@ -50,7 +50,7 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
             const float *src_block = &input[r][c];
             float *dst_block = &tmp[r][c];
 
-            kernel_conv3_vert_4x80(
+            kernel_conv3_vert_4x96(
                 src_block,
                 src_stride,
                 dst_block,
@@ -99,14 +99,14 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
         }
     }
 
-    // Process bulk horizontal with 4x80 kernel
+    // Process bulk horizontal with 4x96 kernel
     for (r = 0; r + block_h <= HEIGHT; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
             const float *src_block = &tmp[r][c];
             float *dst_block = &output[r][c];
 
-            kernel_conv3_horiz_4x80(
+            kernel_conv3_horiz_4x96(
                 src_block,
                 src_stride,
                 dst_block,
@@ -196,14 +196,14 @@ void gaussian_blur_reference(float input[HEIGHT][WIDTH], float output[HEIGHT][WI
 #endif
 
 // Sobel operator: computes X and Y gradients from blurred input
-void sobel_4x80(float blurred[HEIGHT][WIDTH],
+void sobel_4x96(float blurred[HEIGHT][WIDTH],
                 float grad_x[HEIGHT][WIDTH],
                 float grad_y[HEIGHT][WIDTH])
 {
     const int src_stride = WIDTH;
     const int dst_stride = WIDTH;
     const int block_h = 4;
-    const int block_w = 80;
+    const int block_w = 96;
     const int scalar_left = 8; // multiple of 8 for optimization
 
     static float tmp_x[HEIGHT][WIDTH];
@@ -245,7 +245,7 @@ void sobel_4x80(float blurred[HEIGHT][WIDTH],
             const float *src_block = &blurred[r][c];
             float *dst_block = &tmp_x[r][c];
 
-            kernel_sobel_vert_smooth_4x80(
+            kernel_sobel_vert_smooth_4x96(
                 src_block,
                 src_stride,
                 dst_block,
@@ -299,7 +299,7 @@ void sobel_4x80(float blurred[HEIGHT][WIDTH],
             const float *src_block = &tmp_x[r][c];
             float *dst_block = &grad_x[r][c];
 
-            kernel_sobel_horiz_deriv_4x80(
+            kernel_sobel_horiz_deriv_4x96(
                 src_block,
                 src_stride,
                 dst_block,
@@ -357,7 +357,7 @@ void sobel_4x80(float blurred[HEIGHT][WIDTH],
             const float *src_block = &blurred[r][c];
             float *dst_block = &tmp_y[r][c];
 
-            kernel_sobel_vert_deriv_4x80(
+            kernel_sobel_vert_deriv_4x96(
                 src_block,
                 src_stride,
                 dst_block,
@@ -409,7 +409,7 @@ void sobel_4x80(float blurred[HEIGHT][WIDTH],
             const float *src_block = &tmp_y[r][c];
             float *dst_block = &grad_y[r][c];
 
-            kernel_sobel_horiz_smooth_4x80(
+            kernel_sobel_horiz_smooth_4x96(
                 src_block,
                 src_stride,
                 dst_block,

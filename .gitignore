@@ -1,2 +1,4 @@
 **/*.o
 blur_test
+blur_benchmark
+**/*.csv

@@ -23,9 +23,9 @@ int main(int argc, char *argv[]) {
     double sums;
 
     // Store FLOPS/cycle results for CSV output
-    double flops_gaussian_4x80 = 0.0;
-    double flops_sobel_4x80 = 0.0;
-    double flops_pipeline_4x80 = 0.0;
+    double flops_gaussian_4x96 = 0.0;
+    double flops_sobel_4x96 = 0.0;
+    double flops_pipeline_4x96 = 0.0;
     double flops_gaussian_ref = 0.0;
     double flops_sobel_ref = 0.0;
     double flops_pipeline_ref = 0.0;
@@ -41,77 +41,77 @@ int main(int argc, char *argv[]) {
     static float blurred_ref[HEIGHT][WIDTH];
 
 
-    // ========== BENCHMARK OPTIMIZED 4x80 ==========
+    // ========== BENCHMARK OPTIMIZED 4x96 ==========
 
-    // Benchmark Gaussian blur 4x80
+    // Benchmark Gaussian blur 4x96
     if (!csv_mode) {
         t0 = rdtsc();
-        gaussian_blur_4x80(input, blurred);
+        gaussian_blur_4x96(input, blurred);
         t1 = rdtsc();
         cycles = (double)(t1 - t0);
-        printf("Gaussian blur 4x80 took %.0f cycles\n", cycles);
+        printf("Gaussian blur 4x96 took %.0f cycles\n", cycles);
         printf(" %.6lf FLOPS/cycle\n", (12.0*HEIGHT*WIDTH)/cycles);
     }
 
     sums = .0f;
     for (size_t i = 0; i < RUNS; ++i) {
         t0 = rdtsc();
-        gaussian_blur_4x80(input, blurred);
+        gaussian_blur_4x96(input, blurred);
         t1 = rdtsc();
         sums += (double)(t1 - t0);
     }
-    flops_gaussian_4x80 = (12.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    flops_gaussian_4x96 = (12.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
     if (!csv_mode) {
-        printf("Gaussian blur 4x80 average took %.0f cycles\n", sums/(1.0*RUNS));
-        printf(" %.6lf FLOPS/cycle\n", flops_gaussian_4x80);
+        printf("Gaussian blur 4x96 average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_gaussian_4x96);
     }
 
-    // Benchmark Sobel 4x80 (operates on blurred image)
+    // Benchmark Sobel 4x96 (operates on blurred image)
     if (!csv_mode) {
         t0 = rdtsc();
-        sobel_4x80(blurred, grad_x, grad_y);
+        sobel_4x96(blurred, grad_x, grad_y);
         t1 = rdtsc();
         cycles = (double)(t1 - t0);
-        printf("Sobel 4x80 took %.0f cycles\n", cycles);
+        printf("Sobel 4x96 took %.0f cycles\n", cycles);
         printf(" %.6lf FLOPS/cycle\n", (20.0*HEIGHT*WIDTH)/cycles);
     }
 
     sums = .0f;
     for (size_t i = 0; i < RUNS; ++i) {
         t0 = rdtsc();
-        sobel_4x80(blurred, grad_x, grad_y);
+        sobel_4x96(blurred, grad_x, grad_y);
         t1 = rdtsc();
         sums += (double)(t1 - t0);
     }
-    flops_sobel_4x80 = (20.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    flops_sobel_4x96 = (20.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
     if (!csv_mode) {
-        printf("Sobel 4x80 average took %.0f cycles\n", sums/(1.0*RUNS));
-        printf(" %.6lf FLOPS/cycle\n", flops_sobel_4x80);
+        printf("Sobel 4x96 average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_sobel_4x96);
     }
 
-    // Benchmark full pipeline 4x80
+    // Benchmark full pipeline 4x96
     if (!csv_mode) {
         t0 = rdtsc();
-        gaussian_blur_4x80(input, blurred);
-        sobel_4x80(blurred, grad_x, grad_y);
+        gaussian_blur_4x96(input, blurred);
+        sobel_4x96(blurred, grad_x, grad_y);
         t1 = rdtsc();
         cycles = (double)(t1 - t0);
-        printf("Canny/Sobel pipeline 4x80 took %.0f cycles\n", cycles);
+        printf("Canny/Sobel pipeline 4x96 took %.0f cycles\n", cycles);
         printf(" %.6lf FLOPS/cycle\n", (32.0*HEIGHT*WIDTH)/cycles);
     }
 
     sums = .0f;
     for (size_t i = 0; i < RUNS; ++i) {
         t0 = rdtsc();
-        gaussian_blur_4x80(input, blurred);
-        sobel_4x80(blurred, grad_x, grad_y);
+        gaussian_blur_4x96(input, blurred);
+        sobel_4x96(blurred, grad_x, grad_y);
         t1 = rdtsc();
         sums += (double)(t1 - t0);
     }
-    flops_pipeline_4x80 = (32.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    flops_pipeline_4x96 = (32.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
     if (!csv_mode) {
-        printf("Canny/Sobel pipeline 4x80 average took %.0f cycles\n", sums/(1.0*RUNS));
-        printf(" %.6lf FLOPS/cycle\n", flops_pipeline_4x80);
+        printf("Canny/Sobel pipeline 4x96 average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_pipeline_4x96);
     }
 
 
@@ -197,11 +197,11 @@ int main(int argc, char *argv[]) {
     }
 
     // CSV output mode: print single line with all FLOPS/cycle values
-    // Format: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x80,sobel_4x80,pipeline_4x80
+    // Format: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x96,sobel_4x96,pipeline_4x96
     if (csv_mode) {
         printf("%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
                flops_gaussian_ref, flops_sobel_ref, flops_pipeline_ref,
-               flops_gaussian_4x80, flops_sobel_4x80, flops_pipeline_4x80);
+               flops_gaussian_4x96, flops_sobel_4x96, flops_pipeline_4x96);
     }
 
     return 0;

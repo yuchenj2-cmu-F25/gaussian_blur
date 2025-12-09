@@ -41,30 +41,30 @@ void kernel_conv3_vert_10x8_lower(const float *restrict src, int src_stride,
                         float *restrict dst, int dst_stride);
 
 /* 4x80 Vertical convolution kernels (unrolled) */
-void kernel_conv3_vert_4x80(const float *restrict src, int src_stride,
-                        float *restrict dst, int dst_stride);
-
 void kernel_conv3_vert_4x80_upper(const float *restrict src, int src_stride,
                         float *restrict dst, int dst_stride);
 
 void kernel_conv3_vert_4x80_lower(const float *restrict src, int src_stride,
                         float *restrict dst, int dst_stride);
 
-/* 4x80 Horizontal convolution kernel (macro-based, unrolled) */
-void kernel_conv3_horiz_4x80(const float *restrict src, int src_stride,
+/* 4x96 convolution kernel (macro-based, unrolled) */
+void kernel_conv3_vert_4x96(const float *restrict src, int src_stride,
+                        float *restrict dst, int dst_stride);
+
+void kernel_conv3_horiz_4x96(const float *restrict src, int src_stride,
                               float *restrict dst, int dst_stride);
 
-/* Sobel 4x80 kernels (macro-based, unrolled) */
-void kernel_sobel_vert_smooth_4x80(const float *restrict src, int src_stride,
+/* Sobel 4x96 kernels (macro-based, unrolled) */
+void kernel_sobel_vert_smooth_4x96(const float *restrict src, int src_stride,
                                     float *restrict dst, int dst_stride);
 
-void kernel_sobel_vert_deriv_4x80(const float *restrict src, int src_stride,
+void kernel_sobel_vert_deriv_4x96(const float *restrict src, int src_stride,
                                    float *restrict dst, int dst_stride);
 
-void kernel_sobel_horiz_smooth_4x80(const float *restrict src, int src_stride,
+void kernel_sobel_horiz_smooth_4x96(const float *restrict src, int src_stride,
                                      float *restrict dst, int dst_stride);
 
-void kernel_sobel_horiz_deriv_4x80(const float *restrict src, int src_stride,
+void kernel_sobel_horiz_deriv_4x96(const float *restrict src, int src_stride,
                                     float *restrict dst, int dst_stride);
 
 /* 24x80 Vertical convolution kernel (macro-based, unrolled) */
