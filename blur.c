@@ -437,6 +437,137 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
     }
 }
 
+void gaussian_blur_24x80_v2(float input[HEIGHT][WIDTH],
+                             float output[HEIGHT][WIDTH])
+{
+    const int src_stride = WIDTH;
+    const int dst_stride = WIDTH;
+    const int block_h = 24;
+    const int block_w = 80;
+    const int scalar_left = 8; // multiple of 8 for optimization
+
+    static float tmp[HEIGHT][WIDTH];
+
+    // 1D Gaussian kernel coefficients
+    const float k0f = 0.25f;
+    const float k1f = 0.5f;
+    const float k2f = 0.25f;
+
+    // ========== VERTICAL PASS ==========
+
+    // Handle top row (row 0) with scalar code
+    for (int c = 0; c < WIDTH; ++c) {
+        const float *row = &input[0][0];
+        tmp[0][c] = k0f * row[c] + k1f * row[c] + k2f * input[1][c];
+    }
+
+    // Handle left columns (0 to scalar_left-1) for rows 1 to HEIGHT-1 with scalar code
+    for (int r = 1; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &input[r_m1][0];
+        const float *row_0  = &input[r][0];
+        const float *row_p1 = &input[r_p1][0];
+
+        for (int c = 0; c < scalar_left; ++c) {
+            tmp[r][c] = k0f * row_m1[c] + k1f * row_0[c] + k2f * row_p1[c];
+        }
+    }
+
+    // Process bulk vertical with 24x80 kernel
+    int r;
+    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
+            const float *src_block = &input[r][c];
+            float *dst_block = &tmp[r][c];
+
+            kernel_conv3_vert_24x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride
+            );
+        }
+
+        // Handle remaining right columns for this row block with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            int rr_m1 = rr - 1;
+            int rr_p1 = (rr == HEIGHT - 1) ? (HEIGHT - 1) : (rr + 1);
+            const float *row_m1 = &input[rr_m1][0];
+            const float *row_0  = &input[rr][0];
+            const float *row_p1 = &input[rr_p1][0];
+
+            for (int cc = c; cc < WIDTH; ++cc) {
+                tmp[rr][cc] = k0f * row_m1[cc] + k1f * row_0[cc] + k2f * row_p1[cc];
+            }
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        int r_m1 = r - 1;
+        int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
+        const float *row_m1 = &input[r_m1][0];
+        const float *row_0  = &input[r][0];
+        const float *row_p1 = &input[r_p1][0];
+
+        for (int c = scalar_left; c < WIDTH; ++c) {
+            tmp[r][c] = k0f * row_m1[c] + k1f * row_0[c] + k2f * row_p1[c];
+        }
+    }
+
+    // ========== HORIZONTAL PASS ==========
+
+    // Handle all rows
+    for (int r = 0; r < HEIGHT; ++r) {
+        const float *row = &tmp[r][0];
+
+        // Handle left edge
+        output[r][0] = k0f * row[0] + k1f * row[0] + k2f * row[1];
+
+        for (int c = 1; c < scalar_left; ++c) {
+            output[r][c] = k0f * row[c-1] + k1f * row[c] + k2f * row[c+1];
+        }
+    }
+
+    // Process bulk horizontal with 24x80 kernel
+    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
+        int c;
+        for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
+            const float *src_block = &tmp[r][c];
+            float *dst_block = &output[r][c];
+
+            kernel_conv3_horiz_24x80(
+                src_block,
+                src_stride,
+                dst_block,
+                dst_stride
+            );
+        }
+
+        // Handle remaining right columns for this row block with scalar
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
+            const float *row = &tmp[rr][0];
+            for (int cc = c; cc < WIDTH - 1; ++cc) {
+                output[rr][cc] = k0f * row[cc-1] + k1f * row[cc] + k2f * row[cc+1];
+            }
+            // Handle right edge
+            output[rr][WIDTH-1] = k0f * row[WIDTH-2] + k1f * row[WIDTH-1] + k2f * row[WIDTH-1];
+        }
+    }
+
+    // Handle remaining bottom rows with scalar
+    for (; r < HEIGHT; ++r) {
+        const float *row = &tmp[r][0];
+        for (int c = scalar_left; c < WIDTH - 1; ++c) {
+            output[r][c] = k0f * row[c-1] + k1f * row[c] + k2f * row[c+1];
+        }
+        // Handle right edge
+        output[r][WIDTH-1] = k0f * row[WIDTH-2] + k1f * row[WIDTH-1] + k2f * row[WIDTH-1];
+    }
+}
+
 // Disable auto-vectorization for reference implementation
 // This ensures we have a true scalar baseline for comparison
 #ifdef __GNUC__
