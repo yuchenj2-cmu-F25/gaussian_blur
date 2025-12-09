@@ -311,10 +311,8 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
 {
     const int src_stride = WIDTH;
     const int dst_stride = WIDTH;
-    const int vert_block_h = 4;
-    const int vert_block_w = 80;
-    const int horiz_block_h = 5;
-    const int horiz_block_w = 16;
+    const int block_h = 4;
+    const int block_w = 80;
     const int scalar_left = 8; // multiple of 8 for optimization
 
     static float tmp[HEIGHT][WIDTH];
@@ -347,9 +345,9 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
 
     // Process bulk vertical with 4x80 kernel
     int r;
-    for (r = 1; r + vert_block_h <= HEIGHT; r += vert_block_h) {
+    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
         int c;
-        for (c = scalar_left; c + vert_block_w <= WIDTH; c += vert_block_w) {
+        for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
             const float *src_block = &input[r][c];
             float *dst_block = &tmp[r][c];
 
@@ -362,7 +360,7 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
         }
 
         // Handle remaining right columns for this row block with scalar
-        for (int rr = r; rr < r + vert_block_h && rr < HEIGHT; ++rr) {
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
             int rr_m1 = rr - 1;
             int rr_p1 = (rr == HEIGHT - 1) ? (HEIGHT - 1) : (rr + 1);
             const float *row_m1 = &input[rr_m1][0];
@@ -402,14 +400,14 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
         }
     }
 
-    // Process bulk horizontal with 5x16 kernel
-    for (r = 0; r + horiz_block_h <= HEIGHT; r += horiz_block_h) {
+    // Process bulk horizontal with 4x80 kernel
+    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
         int c;
-        for (c = scalar_left; c + horiz_block_w < WIDTH; c += horiz_block_w) {
+        for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
             const float *src_block = &tmp[r][c];
             float *dst_block = &output[r][c];
 
-            kernel_conv3_horiz_5x16(
+            kernel_conv3_horiz_4x80(
                 src_block,
                 src_stride,
                 dst_block,
@@ -418,7 +416,7 @@ void gaussian_blur_4x80(float input[HEIGHT][WIDTH],
         }
 
         // Handle remaining right columns for this row block with scalar
-        for (int rr = r; rr < r + horiz_block_h && rr < HEIGHT; ++rr) {
+        for (int rr = r; rr < r + block_h && rr < HEIGHT; ++rr) {
             const float *row = &tmp[rr][0];
             for (int cc = c; cc < WIDTH - 1; ++cc) {
                 output[rr][cc] = k0f * row[cc-1] + k1f * row[cc] + k2f * row[cc+1];

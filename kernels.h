@@ -50,6 +50,10 @@ void kernel_conv3_vert_4x80_upper(const float *restrict src, int src_stride,
 void kernel_conv3_vert_4x80_lower(const float *restrict src, int src_stride,
                         float *restrict dst, int dst_stride);
 
+/* 4x80 Horizontal convolution kernel (macro-based, unrolled) */
+void kernel_conv3_horiz_4x80(const float *restrict src, int src_stride,
+                              float *restrict dst, int dst_stride);
+
 /* 24x80 Vertical convolution kernel (macro-based, unrolled) */
 void kernel_conv3_vert_24x80(const float *restrict src, int src_stride,
                               float *restrict dst, int dst_stride);
