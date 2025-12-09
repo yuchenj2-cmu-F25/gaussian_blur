@@ -3,11 +3,11 @@
 # ------------------------------------------------------------
 
 CC      := gcc
-CFLAGS  := -O3 -march=native -Wall -Wextra
+CFLAGS  := -O3 -march=native -Wall -Wextra -Ikernel1
 TARGET  := blur_test
-SRCS    := $(wildcard *.c)
+SRCS    := main.c $(wildcard kernel1/*.c)
 OBJS    := $(SRCS:.c=.o)
-HEADERS := $(wildcard *.h)
+HEADERS := $(wildcard kernel1/*.h)
 
 # Default build rule
 all: $(TARGET)

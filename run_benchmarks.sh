@@ -44,11 +44,12 @@ compile_with_dimensions() {
 
     # Compile with dimension macros
     # Override HEIGHT, WIDTH, and RUNS from config.h
-    gcc -O3 -march=native -Wall -Wextra \
+    gcc -O3 -march=native -Wall -Wextra -Ikernel1 \
         -DHEIGHT=${height} -DWIDTH=${width} -DRUNS=100 \
         -o blur_benchmark \
-        main.c blur.c utils.c kernels_vert.c kernels_horiz.c \
-        kernels_vert_10x8.c kernels_vert_4x80.c
+        main.c \
+        kernel1/blur.c kernel1/utils.c kernel1/kernels_vert.c kernel1/kernels_horiz.c \
+        kernel1/kernels_vert_10x8.c kernel1/kernels_vert_4x80.c
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Compilation successful!${NC}"
