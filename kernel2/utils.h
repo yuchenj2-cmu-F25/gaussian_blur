@@ -7,8 +7,8 @@
 unsigned long long rdtsc(void);
 
 /* Utility functions */
-void fill_random_image(float img[HEIGHT][WIDTH]);
-float compare_images(float ref[HEIGHT][WIDTH], float test[HEIGHT][WIDTH]);
+void fill_random_array(float *arr, int size);
 float compare_arrays(float *ref, float *test, int size);
 
 #endif /* UTILS_H */
+

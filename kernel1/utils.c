@@ -25,3 +25,11 @@ float compare_images(float ref[HEIGHT][WIDTH], float test[HEIGHT][WIDTH]) {
     }
     return diff / (WIDTH * HEIGHT);
 }
+
+float compare_arrays(float *ref, float *test, int size) {
+    float diff = 0.0f;
+    for (int i = 0; i < size; i++) {
+        diff += fabsf(ref[i] - test[i]);
+    }
+    return diff / size;
+}

@@ -24,7 +24,7 @@ declare -a CONFIGS=(
 )
 
 # Benchmark names (must match order in output)
-BENCHMARK_NAMES=("gaussian_ref" "sobel_ref" "pipeline_ref" "gaussian_4x96" "sobel_4x96" "pipeline_4x96")
+BENCHMARK_NAMES=("gaussian_ref" "sobel_ref" "sum_squares_ref" "pipeline_ref" "gaussian_4x96" "sobel_4x96" "sum_squares" "pipeline_4x96")
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -52,13 +52,15 @@ compile_with_dimensions() {
 
     # Compile with dimension macros
     # Override HEIGHT, WIDTH, and RUNS from config.h
-    gcc -O3 -march=native -Wall -Wextra -fopenmp -Ikernel1 \
+    # Note: kernel2/utils.c is excluded (duplicates kernel1/utils.c functions)
+    gcc -O3 -march=native -Wall -Wextra -fopenmp -Ikernel1 -Ikernel2 \
         -DHEIGHT=${height} -DWIDTH=${width} -DRUNS=100 \
         -o blur_benchmark \
         main.c \
         kernel1/blur_main.c kernel1/utils.c \
         kernel1/kernels_vert_4x96_macro.c kernel1/kernels_horiz_4x96_macro.c \
-        kernel1/kernels_sobel_4x96_macro.c
+        kernel1/kernels_sobel_4x96_macro.c \
+        kernel2/sum_of_squares.c
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Compilation successful!${NC}"
@@ -75,7 +77,7 @@ run_single_benchmark() {
     local width=$2
 
     # Run the benchmark in CSV mode and capture output
-    # Output format: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x96,sobel_4x96,pipeline_4x96
+    # Output format: gaussian_ref,sobel_ref,sum_squares_ref,pipeline_ref,gaussian_4x96,sobel_4x96,sum_squares,pipeline_4x96
     local output=$(./blur_benchmark --csv 2>&1)
 
     # Parse CSV output
@@ -109,9 +111,11 @@ for config in "${CONFIGS[@]}"; do
     # Arrays to store results from each outer run
     declare -a gaussian_ref_results=()
     declare -a sobel_ref_results=()
+    declare -a sum_squares_ref_results=()
     declare -a pipeline_ref_results=()
     declare -a gaussian_4x96_results=()
     declare -a sobel_4x96_results=()
+    declare -a sum_squares_results=()
     declare -a pipeline_4x96_results=()
 
     # Run benchmark OUTER_RUNS times
@@ -121,18 +125,20 @@ for config in "${CONFIGS[@]}"; do
         # Run single benchmark and parse CSV results
         csv_line=$(run_single_benchmark "$HEIGHT" "$WIDTH")
 
-        # Parse CSV: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x96,sobel_4x96,pipeline_4x96
-        IFS=',' read -r g_ref s_ref p_ref g_4x96 s_4x96 p_4x96 <<< "$csv_line"
+        # Parse CSV: gaussian_ref,sobel_ref,sum_squares_ref,pipeline_ref,gaussian_4x96,sobel_4x96,sum_squares,pipeline_4x96
+        IFS=',' read -r g_ref s_ref ss_ref p_ref g_4x96 s_4x96 ss_4x96 p_4x96 <<< "$csv_line"
 
         # Store results
         gaussian_ref_results+=("$g_ref")
         sobel_ref_results+=("$s_ref")
+        sum_squares_ref_results+=("$ss_ref")
         pipeline_ref_results+=("$p_ref")
         gaussian_4x96_results+=("$g_4x96")
         sobel_4x96_results+=("$s_4x96")
+        sum_squares_results+=("$ss_4x96")
         pipeline_4x96_results+=("$p_4x96")
 
-        echo "    Ref: g=$g_ref, s=$s_ref, p=$p_ref | 4x96: g=$g_4x96, s=$s_4x96, p=$p_4x96"
+        echo "    Ref: g=$g_ref, s=$s_ref, ss=$ss_ref, p=$p_ref | 4x96: g=$g_4x96, s=$s_4x96, ss=$ss_4x96, p=$p_4x96"
     done
 
     # Calculate averages
@@ -141,9 +147,11 @@ for config in "${CONFIGS[@]}"; do
 
     avg_gaussian_ref=$(calculate_average "${gaussian_ref_results[@]}")
     avg_sobel_ref=$(calculate_average "${sobel_ref_results[@]}")
+    avg_sum_squares_ref=$(calculate_average "${sum_squares_ref_results[@]}")
     avg_pipeline_ref=$(calculate_average "${pipeline_ref_results[@]}")
     avg_gaussian_4x96=$(calculate_average "${gaussian_4x96_results[@]}")
     avg_sobel_4x96=$(calculate_average "${sobel_4x96_results[@]}")
+    avg_sum_squares=$(calculate_average "${sum_squares_results[@]}")
     avg_pipeline_4x96=$(calculate_average "${pipeline_4x96_results[@]}")
 
     # Generate CSV filename
@@ -156,9 +164,11 @@ for config in "${CONFIGS[@]}"; do
 Benchmark,FLOPS_per_Cycle
 gaussian_ref,$avg_gaussian_ref
 sobel_ref,$avg_sobel_ref
+sum_squares_ref,$avg_sum_squares_ref
 pipeline_ref,$avg_pipeline_ref
 gaussian_4x96,$avg_gaussian_4x96
 sobel_4x96,$avg_sobel_4x96
+sum_squares,$avg_sum_squares
 pipeline_4x96,$avg_pipeline_4x96
 EOF
 
@@ -169,9 +179,11 @@ EOF
     # Clean up arrays for next iteration
     unset gaussian_ref_results
     unset sobel_ref_results
+    unset sum_squares_ref_results
     unset pipeline_ref_results
     unset gaussian_4x96_results
     unset sobel_4x96_results
+    unset sum_squares_results
     unset pipeline_4x96_results
 done
 
