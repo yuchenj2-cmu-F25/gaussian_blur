@@ -6,7 +6,7 @@
 set -e  # Exit on error
 
 # Configuration
-OUTER_RUNS=10  # Number of times to run the entire benchmark suite
+OUTER_RUNS=1  # Number of times to run the entire benchmark suite
 OUTPUT_DIR="benchmark_results"
 
 # OpenMP configuration
@@ -58,7 +58,6 @@ compile_with_dimensions() {
         kernel1/kernels_vert_4x96_macro.c kernel1/kernels_horiz_4x96_macro.c \
         kernel1/kernels_sobel_4x96_macro.c \
         kernel2/sum_of_squares.c \
-        kernel2/sum_of_squares_reference.c \
         kernel3/kernel_naive.c \
         kernel3/kernel_reduction_tree.c
 
