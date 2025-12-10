@@ -9,6 +9,9 @@ set -e  # Exit on error
 OUTER_RUNS=10  # Number of times to run the entire benchmark suite
 OUTPUT_DIR="benchmark_results"
 
+# OpenMP configuration
+export OMP_NUM_THREADS=16
+
 # Image dimension configurations (square images)
 declare -a CONFIGS=(
     "128:128"   # HEIGHT:WIDTH
@@ -46,7 +49,7 @@ compile_with_dimensions() {
 
     # Compile with dimension macros
     # Override HEIGHT, WIDTH, and RUNS from config.h
-    gcc -O3 -march=native -Wall -Wextra -Ikernel1 \
+    gcc -O3 -march=native -Wall -Wextra -fopenmp -Ikernel1 \
         -DHEIGHT=${height} -DWIDTH=${width} -DRUNS=100 \
         -o blur_benchmark \
         main.c \
