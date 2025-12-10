@@ -10,7 +10,10 @@ OUTER_RUNS=10  # Number of times to run the entire benchmark suite
 OUTPUT_DIR="benchmark_results"
 
 # OpenMP configuration
-export OMP_NUM_THREADS=16
+export OMP_NUM_THREADS=6
+export OMP_PROC_BIND=TRUE
+export OMP_PLACES=cores
+export OMP_SCHEDULE=static
 
 # Image dimension configurations (square images)
 declare -a CONFIGS=(
