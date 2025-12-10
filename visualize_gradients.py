@@ -86,18 +86,23 @@ def main() -> None:
     gy_u8 = normalize_to_uint8(gy, use_abs=True)
     mag_u8 = normalize_to_uint8(mag, use_abs=False)
 
-    fig, axes = plt.subplots(1, 4, figsize=(14, 4))
-    axes[0].imshow(img_u8, cmap="gray")
-    axes[0].set_title("Input")
-    axes[1].imshow(gx_u8, cmap="gray")
-    axes[1].set_title("Grad X")
-    axes[2].imshow(gy_u8, cmap="gray")
-    axes[2].set_title("Grad Y")
-    axes[3].imshow(mag_u8, cmap="gray")
-    axes[3].set_title("Gradient magnitude")
+    fig, axes = plt.subplots(2, 2, figsize=(8, 8))
 
-    for ax in axes:
-        ax.axis("off")
+    axes[0, 0].imshow(img_u8, cmap="gray")
+    axes[0, 0].set_title("Input")
+
+    axes[0, 1].imshow(gx_u8, cmap="gray")
+    axes[0, 1].set_title("Grad X")
+
+    axes[1, 0].imshow(gy_u8, cmap="gray")
+    axes[1, 0].set_title("Grad Y")
+
+    axes[1, 1].imshow(mag_u8, cmap="gray")
+    axes[1, 1].set_title("Gradient magnitude")
+
+    for row in axes:
+        for ax in row:
+            ax.axis("off")
 
     plt.tight_layout()
 
@@ -111,4 +116,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
