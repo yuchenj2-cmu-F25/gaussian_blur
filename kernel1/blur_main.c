@@ -5,6 +5,10 @@
 #include "kernels.h"
 #include "config.h"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
                         float output[HEIGHT][WIDTH])
 {
@@ -43,8 +47,11 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Process bulk vertical with 4x96 kernel
-    int r;
-    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+    const int vert_start = 1;
+    const int vert_bottom_start = vert_start + ((HEIGHT - vert_start) / block_h) * block_h;
+
+    #pragma omp parallel for
+    for (int r = vert_start; r + block_h <= HEIGHT; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
             const float *src_block = &input[r][c];
@@ -73,7 +80,7 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (; r < HEIGHT; ++r) {
+    for (int r = vert_bottom_start; r < HEIGHT; ++r) {
         int r_m1 = r - 1;
         int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
         const float *row_m1 = &input[r_m1][0];
@@ -100,7 +107,11 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Process bulk horizontal with 4x96 kernel
-    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
+    const int horiz_start = 0;
+    const int horiz_bottom_start = (HEIGHT / block_h) * block_h;
+
+    #pragma omp parallel for
+    for (int r = horiz_start; r + block_h <= HEIGHT; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
             const float *src_block = &tmp[r][c];
@@ -126,7 +137,7 @@ void gaussian_blur_4x96(float input[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (; r < HEIGHT; ++r) {
+    for (int r = horiz_bottom_start; r < HEIGHT; ++r) {
         const float *row = &tmp[r][0];
         for (int c = scalar_left; c < WIDTH - 1; ++c) {
             output[r][c] = k0f * row[c-1] + k1f * row[c] + k2f * row[c+1];
@@ -238,8 +249,20 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Process bulk vertical smoothing
-    int r;
-    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+    const int sobel_x_vert_start = 1;
+    int sobel_x_vert_bottom_start;
+    {
+        int range = HEIGHT - sobel_x_vert_start;
+        if (range <= 0) {
+            sobel_x_vert_bottom_start = sobel_x_vert_start;
+        } else {
+            int remainder = range % block_h;
+            sobel_x_vert_bottom_start = HEIGHT - remainder;
+        }
+    }
+
+    #pragma omp parallel for
+    for (int r = sobel_x_vert_start; r < sobel_x_vert_bottom_start; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
             const float *src_block = &blurred[r][c];
@@ -268,7 +291,7 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (; r < HEIGHT; ++r) {
+    for (int r = sobel_x_vert_bottom_start; r < HEIGHT; ++r) {
         int r_m1 = r - 1;
         int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
         const float *row_m1 = &blurred[r_m1][0];
@@ -293,7 +316,20 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Process bulk horizontal derivative
-    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
+    const int sobel_x_horiz_start = 0;
+    int sobel_x_horiz_bottom_start;
+    {
+        int range = HEIGHT - sobel_x_horiz_start;
+        if (range <= 0) {
+            sobel_x_horiz_bottom_start = sobel_x_horiz_start;
+        } else {
+            int remainder = range % block_h;
+            sobel_x_horiz_bottom_start = HEIGHT - remainder;
+        }
+    }
+
+    #pragma omp parallel for
+    for (int r = sobel_x_horiz_start; r < sobel_x_horiz_bottom_start; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
             const float *src_block = &tmp_x[r][c];
@@ -319,7 +355,7 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (; r < HEIGHT; ++r) {
+    for (int r = sobel_x_horiz_bottom_start; r < HEIGHT; ++r) {
         const float *row = &tmp_x[r][0];
         for (int c = scalar_left; c < WIDTH - 1; ++c) {
             grad_x[r][c] = k_deriv0 * row[c-1] + k_deriv1 * row[c+1];
@@ -351,7 +387,20 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Process bulk vertical derivative
-    for (r = 1; r + block_h <= HEIGHT; r += block_h) {
+    const int sobel_y_vert_start = 1;
+    int sobel_y_vert_bottom_start;
+    {
+        int range = HEIGHT - sobel_y_vert_start;
+        if (range <= 0) {
+            sobel_y_vert_bottom_start = sobel_y_vert_start;
+        } else {
+            int remainder = range % block_h;
+            sobel_y_vert_bottom_start = HEIGHT - remainder;
+        }
+    }
+
+    #pragma omp parallel for
+    for (int r = sobel_y_vert_start; r < sobel_y_vert_bottom_start; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w <= WIDTH; c += block_w) {
             const float *src_block = &blurred[r][c];
@@ -379,7 +428,7 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (; r < HEIGHT; ++r) {
+    for (int r = sobel_y_vert_bottom_start; r < HEIGHT; ++r) {
         int r_m1 = r - 1;
         int r_p1 = (r == HEIGHT - 1) ? (HEIGHT - 1) : (r + 1);
         const float *row_m1 = &blurred[r_m1][0];
@@ -403,7 +452,20 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Process bulk horizontal smoothing
-    for (r = 0; r + block_h <= HEIGHT; r += block_h) {
+    const int sobel_y_horiz_start = 0;
+    int sobel_y_horiz_bottom_start;
+    {
+        int range = HEIGHT - sobel_y_horiz_start;
+        if (range <= 0) {
+            sobel_y_horiz_bottom_start = sobel_y_horiz_start;
+        } else {
+            int remainder = range % block_h;
+            sobel_y_horiz_bottom_start = HEIGHT - remainder;
+        }
+    }
+
+    #pragma omp parallel for
+    for (int r = sobel_y_horiz_start; r < sobel_y_horiz_bottom_start; r += block_h) {
         int c;
         for (c = scalar_left; c + block_w < WIDTH; c += block_w) {
             const float *src_block = &tmp_y[r][c];
@@ -429,7 +491,7 @@ void sobel_4x96(float blurred[HEIGHT][WIDTH],
     }
 
     // Handle remaining bottom rows with scalar
-    for (; r < HEIGHT; ++r) {
+    for (int r = sobel_y_horiz_bottom_start; r < HEIGHT; ++r) {
         const float *row = &tmp_y[r][0];
         for (int c = scalar_left; c < WIDTH - 1; ++c) {
             grad_y[r][c] = k_smooth0 * row[c-1] + k_smooth1 * row[c] + k_smooth0 * row[c+1];
