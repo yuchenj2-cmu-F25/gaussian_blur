@@ -1,7 +1,7 @@
 Benchmark,FLOPS_per_Cycle
-gaussian_ref,.504268
-sobel_ref,2.215565
-pipeline_ref,.982573
-gaussian_4x96,14.901112
-sobel_4x96,11.402975
-pipeline_4x96,12.672219
+gaussian_ref,.503751
+sobel_ref,2.218707
+pipeline_ref,.979984
+gaussian_4x96,14.857000
+sobel_4x96,11.587101
+pipeline_4x96,12.821926
