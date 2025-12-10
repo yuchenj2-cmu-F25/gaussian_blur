@@ -5,6 +5,8 @@
 #include "config.h"
 #include "blur.h"
 #include "utils.h"
+#include "kernel2/sum_of_squares.h"
+#include "kernel3/direction_kernels.h"
 
 int main(int argc, char *argv[]) {
     // Check for CSV output mode
@@ -25,16 +27,28 @@ int main(int argc, char *argv[]) {
     // Store FLOPS/cycle results for CSV output
     double flops_gaussian_4x96 = 0.0;
     double flops_sobel_4x96 = 0.0;
-    double flops_pipeline_4x96 = 0.0;
+    double flops_sum_squares = 0.0;
+    double flops_direction_k3 = 0.0;
+    double flops_pipeline_4x96_k3 = 0.0;
     double flops_gaussian_ref = 0.0;
     double flops_sobel_ref = 0.0;
-    double flops_pipeline_ref = 0.0;
+    double flops_sum_squares_ref = 0.0;
+    double flops_direction_ref = 0.0;
+    double flops_pipeline_ref_k3 = 0.0;
 
     // Gradient maps for Sobel
     static float grad_x[HEIGHT][WIDTH];
     static float grad_y[HEIGHT][WIDTH];
     static float grad_x_ref[HEIGHT][WIDTH];
     static float grad_y_ref[HEIGHT][WIDTH];
+
+    // Magnitude squared maps for Kernel 2
+    static float mag2[HEIGHT * WIDTH];
+    static float mag2_ref[HEIGHT * WIDTH];
+
+    // Direction maps for Kernel 3
+    static float direction[HEIGHT * WIDTH];
+    static float direction_ref[HEIGHT * WIDTH];
 
     // Blurred images
     static float blurred[HEIGHT][WIDTH];
@@ -89,29 +103,103 @@ int main(int argc, char *argv[]) {
         printf(" %.6lf FLOPS/cycle\n", flops_sobel_4x96);
     }
 
-    // Benchmark full pipeline 4x96
+    // Benchmark Sum of Squares (Kernel 2)
+    // Convert 2D arrays to 1D for kernel2
+    static float gx_1d[HEIGHT * WIDTH];
+    static float gy_1d[HEIGHT * WIDTH];
+    for (int r = 0; r < HEIGHT; r++) {
+        for (int c = 0; c < WIDTH; c++) {
+            gx_1d[r * WIDTH + c] = grad_x[r][c];
+            gy_1d[r * WIDTH + c] = grad_y[r][c];
+        }
+    }
+
+    if (!csv_mode) {
+        t0 = rdtsc();
+        kernel2_sum_of_squares(gx_1d, gy_1d, mag2, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        cycles = (double)(t1 - t0);
+        printf("Sum of squares took %.0f cycles\n", cycles);
+        printf(" %.6lf FLOPS/cycle\n", (2.0*HEIGHT*WIDTH)/cycles);
+    }
+
+    sums = 0.0;
+    for (size_t i = 0; i < RUNS; ++i) {
+        t0 = rdtsc();
+        kernel2_sum_of_squares(gx_1d, gy_1d, mag2, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        sums += (double)(t1 - t0);
+    }
+    flops_sum_squares = (2.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    if (!csv_mode) {
+        printf("Sum of squares average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_sum_squares);
+    }
+
+    // Benchmark Direction Classification (Kernel 3.4 - Reduction Tree)
+    if (!csv_mode) {
+        t0 = rdtsc();
+        kernel_direction_reduction_tree(gx_1d, gy_1d, direction, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        cycles = (double)(t1 - t0);
+        printf("Direction Classification (K3.4) took %.0f cycles\n", cycles);
+        printf(" %.6lf FLOPS/cycle\n", (1.0*HEIGHT*WIDTH)/cycles);
+    }
+
+    sums = 0.0;
+    for (size_t i = 0; i < RUNS; ++i) {
+        t0 = rdtsc();
+        kernel_direction_reduction_tree(gx_1d, gy_1d, direction, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        sums += (double)(t1 - t0);
+    }
+    flops_direction_k3 = (1.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    if (!csv_mode) {
+        printf("Direction Classification (K3.4) average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_direction_k3);
+    }
+
+    // Benchmark full pipeline 4x96 (including kernel2 and kernel3)
     if (!csv_mode) {
         t0 = rdtsc();
         gaussian_blur_4x96(input, blurred);
         sobel_4x96(blurred, grad_x, grad_y);
+        // Convert to 1D and compute sum of squares
+        for (int r = 0; r < HEIGHT; r++) {
+            for (int c = 0; c < WIDTH; c++) {
+                gx_1d[r * WIDTH + c] = grad_x[r][c];
+                gy_1d[r * WIDTH + c] = grad_y[r][c];
+            }
+        }
+        kernel2_sum_of_squares(gx_1d, gy_1d, mag2, HEIGHT * WIDTH);
+        kernel_direction_reduction_tree(gx_1d, gy_1d, direction, HEIGHT * WIDTH);
         t1 = rdtsc();
         cycles = (double)(t1 - t0);
-        printf("Canny/Sobel pipeline 4x96 took %.0f cycles\n", cycles);
-        printf(" %.6lf FLOPS/cycle\n", (32.0*HEIGHT*WIDTH)/cycles);
+        printf("Full pipeline (blur+sobel+sum_squares+direction) 4x96 took %.0f cycles\n", cycles);
+        printf(" %.6lf FLOPS/cycle\n", (35.0*HEIGHT*WIDTH)/cycles);
     }
 
-    sums = .0f;
+    sums = 0.0;
     for (size_t i = 0; i < RUNS; ++i) {
         t0 = rdtsc();
         gaussian_blur_4x96(input, blurred);
         sobel_4x96(blurred, grad_x, grad_y);
+        // Convert to 1D and compute sum of squares
+        for (int r = 0; r < HEIGHT; r++) {
+            for (int c = 0; c < WIDTH; c++) {
+                gx_1d[r * WIDTH + c] = grad_x[r][c];
+                gy_1d[r * WIDTH + c] = grad_y[r][c];
+            }
+        }
+        kernel2_sum_of_squares(gx_1d, gy_1d, mag2, HEIGHT * WIDTH);
+        kernel_direction_reduction_tree(gx_1d, gy_1d, direction, HEIGHT * WIDTH);
         t1 = rdtsc();
         sums += (double)(t1 - t0);
     }
-    flops_pipeline_4x96 = (32.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    flops_pipeline_4x96_k3 = (35.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
     if (!csv_mode) {
-        printf("Canny/Sobel pipeline 4x96 average took %.0f cycles\n", sums/(1.0*RUNS));
-        printf(" %.6lf FLOPS/cycle\n", flops_pipeline_4x96);
+        printf("Full pipeline (blur+sobel+sum_squares+direction) 4x96 average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_pipeline_4x96_k3);
     }
 
 
@@ -163,45 +251,123 @@ int main(int argc, char *argv[]) {
         printf(" %.6lf FLOPS/cycle\n", flops_sobel_ref);
     }
 
-    // Benchmark full pipeline reference
+    // Benchmark Sum of Squares reference (Kernel 2)
+    // Convert 2D arrays to 1D for kernel2
+    static float gx_ref_1d[HEIGHT * WIDTH];
+    static float gy_ref_1d[HEIGHT * WIDTH];
+    for (int r = 0; r < HEIGHT; r++) {
+        for (int c = 0; c < WIDTH; c++) {
+            gx_ref_1d[r * WIDTH + c] = grad_x_ref[r][c];
+            gy_ref_1d[r * WIDTH + c] = grad_y_ref[r][c];
+        }
+    }
+
+    if (!csv_mode) {
+        t0 = rdtsc();
+        kernel2_sum_of_squares_reference(gx_ref_1d, gy_ref_1d, mag2_ref, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        cycles = (double)(t1 - t0);
+        printf("Sum of squares reference took %.0f cycles\n", cycles);
+        printf(" %.6lf FLOPS/cycle\n", (2.0*HEIGHT*WIDTH)/cycles);
+    }
+
+    sums = 0.0;
+    for (size_t i = 0; i < RUNS; ++i) {
+        t0 = rdtsc();
+        kernel2_sum_of_squares_reference(gx_ref_1d, gy_ref_1d, mag2_ref, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        sums += (double)(t1 - t0);
+    }
+    flops_sum_squares_ref = (2.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    if (!csv_mode) {
+        printf("Sum of squares reference average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_sum_squares_ref);
+    }
+
+    // Benchmark Direction Classification reference (Kernel 3.1 - Naive)
+    if (!csv_mode) {
+        t0 = rdtsc();
+        kernel_direction_naive(gx_ref_1d, gy_ref_1d, direction_ref, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        cycles = (double)(t1 - t0);
+        printf("Direction Classification reference (K3.1) took %.0f cycles\n", cycles);
+        printf(" %.6lf FLOPS/cycle\n", (1.0*HEIGHT*WIDTH)/cycles);
+    }
+
+    sums = 0.0;
+    for (size_t i = 0; i < RUNS; ++i) {
+        t0 = rdtsc();
+        kernel_direction_naive(gx_ref_1d, gy_ref_1d, direction_ref, HEIGHT * WIDTH);
+        t1 = rdtsc();
+        sums += (double)(t1 - t0);
+    }
+    flops_direction_ref = (1.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    if (!csv_mode) {
+        printf("Direction Classification reference (K3.1) average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_direction_ref);
+    }
+
+    // Benchmark full pipeline reference (including kernel2 and kernel3)
     if (!csv_mode) {
         t0 = rdtsc();
         gaussian_blur_reference(input, blurred_ref);
         sobel_reference(blurred_ref, grad_x_ref, grad_y_ref);
+        // Convert to 1D and compute sum of squares
+        for (int r = 0; r < HEIGHT; r++) {
+            for (int c = 0; c < WIDTH; c++) {
+                gx_ref_1d[r * WIDTH + c] = grad_x_ref[r][c];
+                gy_ref_1d[r * WIDTH + c] = grad_y_ref[r][c];
+            }
+        }
+        kernel2_sum_of_squares_reference(gx_ref_1d, gy_ref_1d, mag2_ref, HEIGHT * WIDTH);
+        kernel_direction_naive(gx_ref_1d, gy_ref_1d, direction_ref, HEIGHT * WIDTH);
         t1 = rdtsc();
         cycles = (double)(t1 - t0);
-        printf("Canny/Sobel pipeline reference took %.0f cycles\n", cycles);
-        printf(" %.6lf FLOPS/cycle\n", (32.0*HEIGHT*WIDTH)/cycles);
+        printf("Full pipeline (blur+sobel+sum_squares+direction) reference took %.0f cycles\n", cycles);
+        printf(" %.6lf FLOPS/cycle\n", (35.0*HEIGHT*WIDTH)/cycles);
     }
 
-    sums = .0f;
+    sums = 0.0;
     for (size_t i = 0; i < RUNS; ++i) {
         t0 = rdtsc();
         gaussian_blur_reference(input, blurred_ref);
         sobel_reference(blurred_ref, grad_x_ref, grad_y_ref);
+        // Convert to 1D and compute sum of squares
+        for (int r = 0; r < HEIGHT; r++) {
+            for (int c = 0; c < WIDTH; c++) {
+                gx_ref_1d[r * WIDTH + c] = grad_x_ref[r][c];
+                gy_ref_1d[r * WIDTH + c] = grad_y_ref[r][c];
+            }
+        }
+        kernel2_sum_of_squares_reference(gx_ref_1d, gy_ref_1d, mag2_ref, HEIGHT * WIDTH);
+        kernel_direction_naive(gx_ref_1d, gy_ref_1d, direction_ref, HEIGHT * WIDTH);
         t1 = rdtsc();
         sums += (double)(t1 - t0);
     }
-    flops_pipeline_ref = (32.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
+    flops_pipeline_ref_k3 = (35.0*HEIGHT*WIDTH)/((double)(sums/(1.0*RUNS)));
     if (!csv_mode) {
-        printf("Canny/Sobel pipeline reference average took %.0f cycles\n", sums/(1.0*RUNS));
-        printf(" %.6lf FLOPS/cycle\n", flops_pipeline_ref);
+        printf("Full pipeline (blur+sobel+sum_squares+direction) reference average took %.0f cycles\n", sums/(1.0*RUNS));
+        printf(" %.6lf FLOPS/cycle\n", flops_pipeline_ref_k3);
     }
 
     // Check correctness
     if (!csv_mode) {
         float diff_x = compare_images(grad_x_ref, grad_x);
         float diff_y = compare_images(grad_y_ref, grad_y);
+        float diff_mag2 = compare_arrays(mag2_ref, mag2, HEIGHT * WIDTH);
+        float diff_direction = compare_arrays(direction_ref, direction, HEIGHT * WIDTH);
         printf("Average difference grad_x from reference: %.6f\n", diff_x);
         printf("Average difference grad_y from reference: %.6f\n", diff_y);
+        printf("Average difference mag2 from reference: %.6f\n", diff_mag2);
+        printf("Average difference direction from reference: %.6f\n", diff_direction);
     }
 
     // CSV output mode: print single line with all FLOPS/cycle values
-    // Format: gaussian_ref,sobel_ref,pipeline_ref,gaussian_4x96,sobel_4x96,pipeline_4x96
+    // Format: gaussian_ref,sobel_ref,sum_squares_ref,direction_ref,pipeline_ref_k3,gaussian_4x96,sobel_4x96,sum_squares,direction_k3,pipeline_4x96_k3
     if (csv_mode) {
-        printf("%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
-               flops_gaussian_ref, flops_sobel_ref, flops_pipeline_ref,
-               flops_gaussian_4x96, flops_sobel_4x96, flops_pipeline_4x96);
+        printf("%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+               flops_gaussian_ref, flops_sobel_ref, flops_sum_squares_ref, flops_direction_ref, flops_pipeline_ref_k3,
+               flops_gaussian_4x96, flops_sobel_4x96, flops_sum_squares, flops_direction_k3, flops_pipeline_4x96_k3);
     }
 
     return 0;

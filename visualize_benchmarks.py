@@ -10,6 +10,8 @@ def load_benchmarks(results_dir: Path):
     gaussian_opt = []
     sobel_ref = []
     sobel_opt = []
+    sum_squares_ref = []
+    sum_squares_opt = []
     pipeline_ref = []
     pipeline_opt = []
 
@@ -28,6 +30,8 @@ def load_benchmarks(results_dir: Path):
         gaussian_opt.append(rows["gaussian_4x96"])
         sobel_ref.append(rows["sobel_ref"])
         sobel_opt.append(rows["sobel_4x96"])
+        sum_squares_ref.append(rows["sum_squares_ref"])
+        sum_squares_opt.append(rows["sum_squares"])
         pipeline_ref.append(rows["pipeline_ref"])
         pipeline_opt.append(rows["pipeline_4x96"])
 
@@ -37,6 +41,8 @@ def load_benchmarks(results_dir: Path):
         gaussian_opt,
         sobel_ref,
         sobel_opt,
+        sum_squares_ref,
+        sum_squares_opt,
         pipeline_ref,
         pipeline_opt,
     )
@@ -50,6 +56,8 @@ def main():
         gaussian_opt,
         sobel_ref,
         sobel_opt,
+        sum_squares_ref,
+        sum_squares_opt,
         pipeline_ref,
         pipeline_opt,
     ) = load_benchmarks(results_dir)
@@ -89,6 +97,21 @@ def main():
     ax_s.grid(True, linestyle=":", alpha=0.5)
     fig_s.tight_layout()
     fig_s.savefig(results_dir / "sobel_benchmark.png", dpi=150)
+
+    # Sum of Squares figure
+    fig_ss, ax_ss = plt.subplots(figsize=(6, 4))
+    ax_ss.plot(sizes, sum_squares_ref, marker="o", label="sum_squares_ref")
+    ax_ss.plot(sizes, sum_squares_opt, marker="o", label="sum_squares")
+    ax_ss.axhline(32.0, color="gray", linestyle="--", label="theoretical peak (32)")
+    ax_ss.set_xticks(sizes)
+    ax_ss.set_xticklabels(x_labels)
+    ax_ss.set_xlabel("Image size (pixels)")
+    ax_ss.set_ylabel("FLOPS_per_Cycle")
+    ax_ss.set_title("Sum of Squares: reference vs optimized")
+    ax_ss.legend()
+    ax_ss.grid(True, linestyle=":", alpha=0.5)
+    fig_ss.tight_layout()
+    fig_ss.savefig(results_dir / "sum_squares_benchmark.png", dpi=150)
 
     # Pipeline figure
     fig_p, ax_p = plt.subplots(figsize=(6, 4))
