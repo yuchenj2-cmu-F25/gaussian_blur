@@ -1,4 +1,4 @@
-## Overview
+## Kernel 1 Overview
 
 This repository contains:
 
@@ -10,51 +10,11 @@ All C benchmarks and pipelines are now built with OpenMP enabled.
 
 ---
 
-## 1. Manual benchmark (single build / run)
-
-Use the existing `Makefile` to build and run the default benchmark executable (`blur_test` from `main.c` and `kernel1/*`).
-
-Before running, set OpenMP environment variables (choose a thread count suitable for your machine; 8 is a good starting point on an 8-core CPU):
-
-```bash
-export OMP_NUM_THREADS=8
-export OMP_PROC_BIND=TRUE
-export OMP_PLACES=cores
-export OMP_SCHEDULE=static
-```
-
-Then build and run from the repo root:
-
-```bash
-make clean
-make          # uses -fopenmp from the Makefile
-make run      # runs ./blur_test
-```
-
-This will:
-
-- Compile with `-O3 -march=native -Wall -Wextra -fopenmp -Ikernel1`.
-- Run the benchmark defined in `main.c`, which:
-  - Fills a random `HEIGHT x WIDTH` image.
-  - Benchmarks reference vs. 4x96 Gaussian blur and Sobel.
-  - Prints FLOPS/cycle and correctness checks.
-
-You can override dimensions at compile time, for example:
-
-```bash
-make clean
-make CFLAGS_ADD="-DWIDTH=1024 -DHEIGHT=1024"
-```
-
-where `CFLAGS_ADD` is an optional extra flags variable you can add to your local build command (or just call `gcc` manually as in the automated script below).
-
----
-
-## 2. Automated benchmark (`run_benchmarks.sh`)
+## 1. Automated benchmark (`run_benchmarks.sh`) (Recommended Way)
 
 The automated script compiles and benchmarks several image sizes and writes average FLOPS/cycle results into CSV files under `benchmark_results/`.
 
-### 2.1 Make the script executable
+### 1.1 Make the script executable
 
 From the repo root:
 
@@ -62,18 +22,9 @@ From the repo root:
 chmod +x run_benchmarks.sh
 ```
 
-### 2.2 Run the full suite with OpenMP
+### 1.2 Run the full suite with OpenMP
 
-Set your OpenMP environment variables (you can change the thread count as needed):
-
-```bash
-export OMP_NUM_THREADS=16
-export OMP_PROC_BIND=TRUE
-export OMP_PLACES=cores
-export OMP_SCHEDULE=static
-```
-
-Then run the script:
+Directly run the script:
 
 ```bash
 ./run_benchmarks.sh
@@ -123,6 +74,46 @@ This generates:
 - `benchmark_results/pipeline_benchmark.png`
 
 Each shows FLOPS/cycle vs. image size for reference and 4x96, with a dashed horizontal line at 32 FLOPS/cycle (a theoretical peak).
+
+---
+
+## 2. Manual benchmark (single build / run)
+
+Use the existing `Makefile` to build and run the default benchmark executable (`blur_test` from `main.c` and `kernel1/*`).
+
+Before running, set OpenMP environment variables (choose a thread count suitable for your machine; 8 is a good starting point on an 8-core CPU):
+
+```bash
+export OMP_NUM_THREADS=8
+export OMP_PROC_BIND=TRUE
+export OMP_PLACES=cores
+export OMP_SCHEDULE=static
+```
+
+Then build and run from the repo root:
+
+```bash
+make clean
+make          # uses -fopenmp from the Makefile
+make run      # runs ./blur_test
+```
+
+This will:
+
+- Compile with `-O3 -march=native -Wall -Wextra -fopenmp -Ikernel1`.
+- Run the benchmark defined in `main.c`, which:
+  - Fills a random `HEIGHT x WIDTH` image.
+  - Benchmarks reference vs. 4x96 Gaussian blur and Sobel.
+  - Prints FLOPS/cycle and correctness checks.
+
+You can override dimensions at compile time, for example:
+
+```bash
+make clean
+make CFLAGS_ADD="-DWIDTH=1024 -DHEIGHT=1024"
+```
+
+where `CFLAGS_ADD` is an optional extra flags variable you can add to your local build command (or just call `gcc` manually as in the automated script below).
 
 ---
 
